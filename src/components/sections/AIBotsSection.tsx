@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Bot, Cpu, Grid3X3, Signal, Users, TrendingUp, Play, Pause, Settings } from 'lucide-react';
+import { Bot, Cpu, Grid3X3, Signal, Users, Play, Settings } from 'lucide-react';
 
 const bots = [
   {

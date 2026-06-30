@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ArrowUpRight, ArrowDownRight, Shield, Target, AlertTriangle } from 'lucide-react';
+import { Shield, Target, AlertTriangle } from 'lucide-react';
 
 const tradingSignals = [
   {

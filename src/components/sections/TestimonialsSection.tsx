@@ -67,7 +67,7 @@ export default function TestimonialsSection() {
               
               {/* Text */}
               <p className="text-[var(--text-muted)] text-sm leading-relaxed mb-6">
-                "{testimonial.quote}"
+                &quot;{testimonial.quote}&quot;
               </p>
 
               {/* Profit badge */}

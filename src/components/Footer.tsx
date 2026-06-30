@@ -25,7 +25,7 @@ export default function Footer() {
               <span className="text-xl font-bold gradient-text">Coindistro</span>
             </div>
             <p className="text-sm text-[var(--text-muted)] max-w-sm leading-relaxed mb-6">
-              Africa's next-generation crypto financial ecosystem. Trade, learn, automate, and invest in one powerful platform.
+              Africa&apos;s next-generation crypto financial ecosystem. Trade, learn, automate, and invest in one powerful platform.
             </p>
             {/* Social links */}
             <div className="flex items-center gap-4">
