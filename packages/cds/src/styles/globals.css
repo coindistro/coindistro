@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   Coindistro Design System (CDS) — Theme Tokens
+   Dark mode is the primary brand experience.
+   ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* Brand */
+    --cds-primary: 263 70% 58%; /* #7C3AED */
+    --cds-primary-foreground: 0 0% 100%;
+    --cds-secondary: 189 94% 43%; /* #06B6D4 */
+    --cds-secondary-foreground: 0 0% 100%;
+
+    /* Semantic */
+    --cds-success: 160 84% 39%;
+    --cds-success-foreground: 0 0% 100%;
+    --cds-warning: 38 92% 50%;
+    --cds-warning-foreground: 0 0% 10%;
+    --cds-danger: 0 84% 60%;
+    --cds-danger-foreground: 0 0% 100%;
+    --cds-info: 199 89% 48%;
+    --cds-info-foreground: 0 0% 100%;
+
+    /* Surfaces — light */
+    --cds-background: 210 40% 98%;
+    --cds-foreground: 222 47% 11%;
+    --cds-surface: 0 0% 100%;
+    --cds-card: 0 0% 100%;
+    --cds-card-foreground: 222 47% 11%;
+    --cds-popover: 0 0% 100%;
+    --cds-popover-foreground: 222 47% 11%;
+    --cds-muted: 210 40% 96%;
+    --cds-muted-foreground: 215 16% 47%;
+    --cds-accent: 263 70% 96%;
+    --cds-accent-foreground: 263 70% 40%;
+    --cds-border: 214 32% 91%;
+    --cds-input: 214 32% 91%;
+    --cds-ring: 263 70% 58%;
+
+    /* Sidebar */
+    --cds-sidebar: 0 0% 100%;
+    --cds-sidebar-foreground: 222 47% 11%;
+    --cds-sidebar-border: 214 32% 91%;
+    --cds-sidebar-accent: 263 70% 96%;
+
+    /* Charts */
+    --cds-chart-1: 263 70% 58%;
+    --cds-chart-2: 189 94% 43%;
+    --cds-chart-3: 160 84% 39%;
+    --cds-chart-4: 38 92% 50%;
+    --cds-chart-5: 0 84% 60%;
+
+    /* Radius / fonts / shadows */
+    --cds-radius: 0.75rem;
+    --cds-font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --cds-font-mono: "JetBrains Mono", ui-monospace, monospace;
+    --cds-shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+    --cds-shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08);
+    --cds-shadow-lg: 0 12px 32px -8px rgb(15 23 42 / 0.12);
+    --cds-shadow-glow: 0 0 40px hsl(263 70% 58% / 0.25);
+  }
+
+  .dark {
+    --cds-primary: 263 70% 62%;
+    --cds-primary-foreground: 0 0% 100%;
+    --cds-secondary: 189 94% 48%;
+    --cds-secondary-foreground: 222 47% 6%;
+
+    --cds-success: 160 84% 42%;
+    --cds-success-foreground: 0 0% 100%;
+    --cds-warning: 38 92% 55%;
+    --cds-warning-foreground: 0 0% 10%;
+    --cds-danger: 0 72% 55%;
+    --cds-danger-foreground: 0 0% 100%;
+    --cds-info: 199 89% 55%;
+    --cds-info-foreground: 0 0% 100%;
+
+    /* Surfaces — dark (Coindistro night) */
+    --cds-background: 230 45% 4%; /* #050816 */
+    --cds-foreground: 210 40% 98%;
+    --cds-surface: 228 40% 8%; /* #0B1020 */
+    --cds-card: 228 40% 8%;
+    --cds-card-foreground: 210 40% 98%;
+    --cds-popover: 228 40% 9%;
+    --cds-popover-foreground: 210 40% 98%;
+    --cds-muted: 225 25% 14%;
+    --cds-muted-foreground: 215 16% 65%;
+    --cds-accent: 263 40% 16%;
+    --cds-accent-foreground: 263 80% 85%;
+    --cds-border: 263 30% 18%;
+    --cds-input: 225 25% 14%;
+    --cds-ring: 263 70% 62%;
+
+    --cds-sidebar: 230 45% 5%;
+    --cds-sidebar-foreground: 210 40% 96%;
+    --cds-sidebar-border: 263 30% 16%;
+    --cds-sidebar-accent: 263 35% 14%;
+
+    --cds-chart-1: 263 70% 65%;
+    --cds-chart-2: 189 94% 50%;
+    --cds-chart-3: 160 84% 45%;
+    --cds-chart-4: 38 92% 55%;
+    --cds-chart-5: 0 72% 58%;
+
+    --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --cds-shadow-md: 0 4px 16px -2px rgb(0 0 0 / 0.45);
+    --cds-shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.55);
+    --cds-shadow-glow: 0 0 48px hsl(263 70% 58% / 0.35);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth antialiased;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Focus — visible, accessible */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .cds-glass {
+    background: hsl(var(--cds-card) / 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--cds-border) / 0.8);
+  }
+
+  .cds-gradient-text {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--cds-primary)),
+      hsl(var(--cds-secondary))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .cds-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+}

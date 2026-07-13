@@ -76,6 +76,13 @@ Coindistro is Africa's next-generation crypto financial ecosystem — a unified 
 - Admin product management, participants, analytics
 - Feature flags, RBAC (`earn.*`), events, workers, scheduler tasks, Prometheus metrics
 
+### Design System (`@coindistro/cds`)
+
+- Official Coindistro Design System package under `packages/cds`
+- Tokens, themes (dark/light/system), shadcn/Radix primitives
+- Forms, layout shells, tables, charts, crypto/fintech components
+- Storybook catalog: `npm run cds:storybook`
+
 ### Frontend
 
 - Coindistro marketing landing page (ecosystem, markets, signals, bots, academy, security, roadmap, CTA)

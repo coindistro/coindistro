@@ -8,6 +8,8 @@
     "build": "npm run build --prefix apps/web",
     "start": "npm run start --prefix apps/web",
     "lint": "npm run lint --prefix apps/web",
+    "cds:storybook": "npm run storybook --workspace=@coindistro/cds",
+    "cds:typecheck": "npm run typecheck --workspace=@coindistro/cds",
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
