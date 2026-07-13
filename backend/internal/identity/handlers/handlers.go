@@ -581,28 +581,42 @@ func (h *Handlers) AdminUpdateInvitationCredits(c *gin.Context) {
 	response.OK(c, "Update credits - not implemented", nil)
 }
 
-// RegisterAuthRoutes registers auth routes on the given group.
+// RegisterAuthRoutes registers public auth routes on the given group.
 func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	auth := rg.Group("/auth")
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
-		auth.POST("/refresh", h.RefreshToken)
-		auth.POST("/logout", h.Logout)
 		auth.GET("/verify-email", h.VerifyEmail)
-		auth.POST("/resend-verification", h.ResendVerification)
 		auth.POST("/forgot-password", h.RequestPasswordReset)
 		auth.POST("/reset-password", h.ResetPassword)
+	}
+}
+
+// RegisterProtectedAuthRoutes registers authenticated auth routes.
+func RegisterProtectedAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
+	auth := rg.Group("/auth")
+	{
+		auth.POST("/refresh", h.RefreshToken)
+		auth.POST("/logout", h.Logout)
+		auth.POST("/resend-verification", h.ResendVerification)
 		auth.PUT("/change-password", h.ChangePassword)
 	}
 }
 
-// RegisterUserRoutes registers user routes on the given group.
+// RegisterUserRoutes registers authenticated user profile routes.
 func RegisterUserRoutes(rg *gin.RouterGroup, h *Handlers) {
 	users := rg.Group("/users")
 	{
 		users.GET("/me", h.GetProfile)
 		users.PUT("/me", h.UpdateProfile)
+	}
+}
+
+// RegisterPublicUserRoutes registers public user availability checks.
+func RegisterPublicUserRoutes(rg *gin.RouterGroup, h *Handlers) {
+	users := rg.Group("/users")
+	{
 		users.GET("/check-email", h.CheckEmailAvailability)
 		users.GET("/check-username", h.CheckUsernameAvailability)
 	}

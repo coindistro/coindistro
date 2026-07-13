@@ -78,17 +78,9 @@ func SetupRouter(
 			})
 		})
 
-		// Public auth routes
+		// Public auth + availability routes
 		handlers.RegisterAuthRoutes(v1, identityHandlers)
-
-		// Email verification and password reset are public
-		v1.GET("/auth/verify-email", identityHandlers.VerifyEmail)
-		v1.POST("/auth/forgot-password", identityHandlers.RequestPasswordReset)
-		v1.POST("/auth/reset-password", identityHandlers.ResetPassword)
-
-		// Email/username checks are public
-		v1.GET("/users/check-email", identityHandlers.CheckEmailAvailability)
-		v1.GET("/users/check-username", identityHandlers.CheckUsernameAvailability)
+		handlers.RegisterPublicUserRoutes(v1, identityHandlers)
 
 		// Authenticated routes
 		protected := v1.Group("")
@@ -98,10 +90,7 @@ func SetupRouter(
 			handlers.RegisterUserRoutes(protected, identityHandlers)
 
 			// Authenticated auth routes
-			protected.POST("/auth/logout", identityHandlers.Logout)
-			protected.POST("/auth/resend-verification", identityHandlers.ResendVerification)
-			protected.PUT("/auth/change-password", identityHandlers.ChangePassword)
-			protected.POST("/auth/refresh", identityHandlers.RefreshToken)
+			handlers.RegisterProtectedAuthRoutes(protected, identityHandlers)
 
 			// Session routes
 			handlers.RegisterSessionRoutes(protected, identityHandlers)
