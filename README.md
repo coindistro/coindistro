@@ -19,6 +19,7 @@ Coindistro is Africa's next-generation crypto financial ecosystem — a unified 
 | Marketing website | ✅ Complete | Next.js landing page (`apps/web`) |
 | Backend infrastructure | ✅ Complete | Go monolith with production-grade foundations |
 | Identity Service | ✅ Complete | Auth, sessions, devices, referrals, invitations, Genesis |
+| Earn Module | ✅ Complete | Products, participation, rewards engine, portfolio, admin APIs |
 | User Service | 🔜 Next (`v0.3.0`) | Profiles, KYC, preferences |
 | Wallet / Payments / Exchange | 📋 Planned | Schema prepared; modules not yet implemented |
 | Academy / Signals / Bots | 📋 Planned | Feature-flag placeholders + SQL schema |
@@ -65,6 +66,15 @@ Coindistro is Africa's next-generation crypto financial ecosystem — a unified 
 - Activity / security log
 - Admin user management (status, roles, credits)
 - Lockout after failed login attempts
+
+### Earn Module (`/api/v1/earn`)
+
+- Product catalog (flexible, fixed, stablecoin, AI smart, signal vault, launchpool, learn & earn, referral)
+- User portfolio overview and participation lifecycle (join, add funds, withdraw, exit)
+- Pluggable reward engine (no custody / real yield execution)
+- Launchpool, Learn & Earn, referral reward APIs (contracts for Academy / Identity)
+- Admin product management, participants, analytics
+- Feature flags, RBAC (`earn.*`), events, workers, scheduler tasks, Prometheus metrics
 
 ### Frontend
 
@@ -209,7 +219,8 @@ See `backend/README.md` for full infrastructure and admin routes.
 | Version | Focus | Status |
 |---------|--------|--------|
 | **v0.1.x** | Marketing landing page | ✅ Done |
-| **v0.2.0** | Backend foundation + Identity Service | ✅ Current |
+| **v0.2.0** | Backend foundation + Identity Service | ✅ Done |
+| **v0.2.1+** | Earn Module (product architecture + APIs) | ✅ Current |
 | **v0.3.0** | User Service (profiles, KYC, preferences) | 🔜 Next |
 | **v0.4.x** | Wallet + Payments foundations | Planned |
 | **v0.5.x** | Merchant / Pay APIs | Planned |

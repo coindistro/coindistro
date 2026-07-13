@@ -16,6 +16,9 @@ import (
 	"github.com/coindistro/backend/internal/cache"
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
+	earnhandlers "github.com/coindistro/backend/internal/earn/handlers"
+	earnservice "github.com/coindistro/backend/internal/earn/service"
+	earnstore "github.com/coindistro/backend/internal/earn/store"
 	"github.com/coindistro/backend/internal/email"
 	"github.com/coindistro/backend/internal/events"
 	"github.com/coindistro/backend/internal/featureflags"
@@ -50,6 +53,7 @@ type Server struct {
 	emailSender  email.Sender
 	storageProv  storage.Provider
 	identitySvc  *idservice.Service
+	earnSvc      *earnservice.Service
 	engine       *gin.Engine
 	http         *http.Server
 }
@@ -220,8 +224,54 @@ func New(cfg *config.Config) (*Server, error) {
 	// Create identity handlers
 	identityHandlers := handlers.New(identitySvc, log.Logger)
 
+	// Initialize Earn Service
+	var earnSvc *earnservice.Service
+	var earnHandlers *earnhandlers.Handlers
+	if db != nil && db.Pool != nil {
+		earnSvc = earnservice.New(
+			earnstore.New(db.Pool),
+			eventBus,
+			jobRegistry,
+			workerPool,
+			ff,
+			nil, // audit logger wired when store is available
+			promMetrics,
+			log.Logger,
+		)
+		earnHandlers = earnhandlers.New(earnSvc, ff, log.Logger)
+		log.Info("earn service initialized")
+
+		// Register earn scheduler tasks
+		if sched != nil {
+			sched.AddTask(scheduler.Task{
+				ID: "earn_daily_rewards", Name: "Earn Daily Reward Calculations",
+				Interval: 24 * time.Hour,
+				Handler:  func(ctx context.Context) error { return earnSvc.RunDailyRewardCalculations(ctx) },
+			})
+			sched.AddTask(scheduler.Task{
+				ID: "earn_lifecycle", Name: "Earn Product Lifecycle Updates",
+				Interval: 15 * time.Minute,
+				Handler:  func(ctx context.Context) error { return earnSvc.RunLifecycleUpdates(ctx) },
+			})
+			sched.AddTask(scheduler.Task{
+				ID: "earn_performance_snapshots", Name: "Earn Performance Snapshots",
+				Interval: 1 * time.Hour,
+				Handler:  func(ctx context.Context) error { return earnSvc.RunPerformanceSnapshots(ctx) },
+			})
+			sched.AddTask(scheduler.Task{
+				ID: "earn_metrics_refresh", Name: "Earn Metrics Refresh",
+				Interval: 1 * time.Minute,
+				Handler: func(ctx context.Context) error {
+					earnSvc.RefreshMetrics(ctx)
+					return nil
+				},
+			})
+			log.Info("earn scheduler tasks registered")
+		}
+	}
+
 	// Setup routes
-	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers)
+	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, earnHandlers)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -249,6 +299,7 @@ func New(cfg *config.Config) (*Server, error) {
 		emailSender:  emailSender,
 		storageProv:  storageProv,
 		identitySvc:  identitySvc,
+		earnSvc:      earnSvc,
 		engine:       engine,
 		http:         httpServer,
 	}, nil

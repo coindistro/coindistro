@@ -542,6 +542,24 @@ docker compose up -d --build
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache |
 
+## Earn Module
+
+Routes are under `/api/v1/earn` (feature flag: `earn.enabled`).
+
+| Area | Paths |
+|------|--------|
+| Products | `GET /earn/products`, `GET /earn/products/:id` |
+| Portfolio | `GET /earn/portfolio` |
+| Participation | `POST /earn/products/:id/join`, `GET /earn/participations`, add-funds / withdraw / exit |
+| Rewards / history | `GET /earn/rewards`, `GET /earn/history` |
+| Launchpool / Learn | `GET /earn/launchpool`, `GET /earn/learn`, `POST /earn/learn/:id/complete` |
+| Referral | `GET /earn/referral/rewards` |
+| Admin | `/earn/admin/products`, analytics, participants, launchpool, learn |
+
+Migration: `migrations/003_earn_service.sql`
+
+Reward calculations are **display/estimate only** — no custody or on-chain execution.
+
 ## Future Microservice Roadmap
 
 The current codebase is a monolith designed for clean extraction into services:

@@ -10,9 +10,10 @@ import (
 	"github.com/coindistro/backend/internal/cache"
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
+	"github.com/coindistro/backend/internal/earn/handlers"
 	"github.com/coindistro/backend/internal/featureflags"
 	"github.com/coindistro/backend/internal/health"
-	"github.com/coindistro/backend/internal/identity/handlers"
+	identityhandlers "github.com/coindistro/backend/internal/identity/handlers"
 	"github.com/coindistro/backend/internal/metrics"
 	"github.com/coindistro/backend/internal/middleware"
 	"github.com/coindistro/backend/internal/rbac"
@@ -28,7 +29,8 @@ func SetupRouter(
 	rbacService *rbac.RBAC,
 	featureFlags *featureflags.Manager,
 	promMetrics *metrics.Metrics,
-	identityHandlers *handlers.Handlers,
+	identityHandlers *identityhandlers.Handlers,
+	earnHandlers *handlers.Handlers,
 ) *gin.Engine {
 	ginMode := gin.ReleaseMode
 	if cfg.App.Debug {
@@ -79,33 +81,38 @@ func SetupRouter(
 		})
 
 		// Public auth + availability routes
-		handlers.RegisterAuthRoutes(v1, identityHandlers)
-		handlers.RegisterPublicUserRoutes(v1, identityHandlers)
+		identityhandlers.RegisterAuthRoutes(v1, identityHandlers)
+		identityhandlers.RegisterPublicUserRoutes(v1, identityHandlers)
 
 		// Authenticated routes
 		protected := v1.Group("")
 		protected.Use(middleware.Authentication(authService))
 		{
 			// User profile routes
-			handlers.RegisterUserRoutes(protected, identityHandlers)
+			identityhandlers.RegisterUserRoutes(protected, identityHandlers)
 
 			// Authenticated auth routes
-			handlers.RegisterProtectedAuthRoutes(protected, identityHandlers)
+			identityhandlers.RegisterProtectedAuthRoutes(protected, identityHandlers)
 
 			// Session routes
-			handlers.RegisterSessionRoutes(protected, identityHandlers)
+			identityhandlers.RegisterSessionRoutes(protected, identityHandlers)
 
 			// Device routes
-			handlers.RegisterDeviceRoutes(protected, identityHandlers)
+			identityhandlers.RegisterDeviceRoutes(protected, identityHandlers)
 
 			// Referral routes
-			handlers.RegisterReferralRoutes(protected, identityHandlers)
+			identityhandlers.RegisterReferralRoutes(protected, identityHandlers)
 
 			// Invitation routes
-			handlers.RegisterInvitationRoutes(protected, identityHandlers)
+			identityhandlers.RegisterInvitationRoutes(protected, identityHandlers)
 
 			// Security/activity routes
-			handlers.RegisterSecurityRoutes(protected, identityHandlers)
+			identityhandlers.RegisterSecurityRoutes(protected, identityHandlers)
+		}
+
+		// Earn module routes (/api/v1/earn/...)
+		if earnHandlers != nil {
+			handlers.RegisterRoutes(v1, earnHandlers, middleware.Authentication(authService))
 		}
 
 		// Admin routes
@@ -114,7 +121,7 @@ func SetupRouter(
 		admin.Use(middleware.RequireRole("admin", "super_admin"))
 		{
 			registerAdminRoutes(admin, rbacService, featureFlags)
-			handlers.RegisterAdminRoutes(admin, identityHandlers)
+			identityhandlers.RegisterAdminRoutes(admin, identityHandlers)
 		}
 	}
 

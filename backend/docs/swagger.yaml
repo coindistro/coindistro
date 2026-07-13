@@ -16,6 +16,13 @@ definitions:
       ip_address:
         type: string
     type: object
+  models.AddFundsRequest:
+    properties:
+      amount:
+        type: number
+    required:
+    - amount
+    type: object
   models.AuthResponse:
     properties:
       access_token:
@@ -40,6 +47,127 @@ definitions:
     - current_password
     - new_password
     type: object
+  models.CompleteLearnRequest:
+    properties:
+      metadata:
+        additionalProperties: true
+        description: Optional metadata from Academy client
+        type: object
+    type: object
+  models.CreateLaunchpoolRequest:
+    properties:
+      allocation_rules:
+        additionalProperties: true
+        type: object
+      description:
+        type: string
+      name:
+        type: string
+      product_id:
+        type: string
+      reward_distribution:
+        additionalProperties: true
+        type: object
+      status:
+        type: string
+      supported_assets:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      window_end:
+        type: string
+      window_start:
+        type: string
+    required:
+    - name
+    - supported_assets
+    - window_end
+    - window_start
+    type: object
+  models.CreateLearnCampaignRequest:
+    properties:
+      academy_course_id:
+        type: string
+      description:
+        type: string
+      ends_at:
+        type: string
+      name:
+        type: string
+      product_id:
+        type: string
+      reward_amount:
+        type: number
+      reward_asset:
+        type: string
+      starts_at:
+        type: string
+      status:
+        type: string
+    required:
+    - name
+    type: object
+  models.CreateProductRequest:
+    properties:
+      capacity_total:
+        type: number
+      category:
+        type: string
+      description:
+        type: string
+      duration_days:
+        type: integer
+      eligibility:
+        additionalProperties: true
+        type: object
+      ends_at:
+        type: string
+      featured:
+        type: boolean
+      max_allocation:
+        type: number
+      metadata:
+        additionalProperties: true
+        type: object
+      min_allocation:
+        type: number
+      name:
+        maxLength: 255
+        minLength: 2
+        type: string
+      reward_apr:
+        type: number
+      reward_model:
+        type: string
+      risk_level:
+        type: string
+      rules:
+        additionalProperties: true
+        type: object
+      slug:
+        maxLength: 255
+        minLength: 2
+        type: string
+      starts_at:
+        type: string
+      status:
+        type: string
+      strategy_profiles:
+        items:
+          type: string
+        type: array
+      supported_assets:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - category
+    - name
+    - slug
+    - supported_assets
+    type: object
   models.DeviceResponse:
     properties:
       browser:
@@ -61,6 +189,11 @@ definitions:
       operating_system:
         type: string
     type: object
+  models.ExitParticipationRequest:
+    properties:
+      reason:
+        type: string
+    type: object
   models.InvitationResponse:
     properties:
       code:
@@ -79,6 +212,18 @@ definitions:
         type: string
       status:
         type: string
+    type: object
+  models.JoinProductRequest:
+    properties:
+      amount:
+        type: number
+      asset:
+        type: string
+      strategy_profile:
+        type: string
+    required:
+    - amount
+    - asset
     type: object
   models.LoginRequest:
     properties:
@@ -108,6 +253,53 @@ definitions:
     required:
     - email
     type: object
+  models.PortfolioOverview:
+    properties:
+      active_products:
+        type: integer
+      allocation_by_asset:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      allocation_by_product:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      available_balance:
+        description: future wallet
+        type: number
+      estimated_rewards:
+        type: number
+      lifetime_rewards:
+        type: number
+      locked_balance:
+        type: number
+      todays_rewards:
+        type: number
+      total_assets_in_earn:
+        type: number
+    type: object
+  models.ProductAnalytics:
+    properties:
+      avg_allocation:
+        type: number
+      capacity_total:
+        type: number
+      capacity_used:
+        type: number
+      capacity_used_pct:
+        type: number
+      participants:
+        type: integer
+      product_id:
+        type: string
+      total_allocated:
+        type: number
+      total_rewards:
+        type: number
+    type: object
   models.ReferralDashboardResponse:
     properties:
       conversion_rate:
@@ -133,6 +325,30 @@ definitions:
       total_invites:
         type: integer
     type: object
+  models.ReferralMilestone:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      required_referrals:
+        type: integer
+      reward_amount:
+        type: number
+      reward_asset:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
   models.ReferralNode:
     properties:
       children:
@@ -147,6 +363,43 @@ definitions:
         type: integer
       username:
         type: string
+    type: object
+  models.ReferralRewardClaim:
+    properties:
+      amount:
+        type: number
+      asset:
+        type: string
+      created_at:
+        type: string
+      granted_at:
+        type: string
+      id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      milestone_id:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.ReferralRewardSummary:
+    properties:
+      claims:
+        items:
+          $ref: '#/definitions/models.ReferralRewardClaim'
+        type: array
+      milestones:
+        items:
+          $ref: '#/definitions/models.ReferralMilestone'
+        type: array
+      total_eligible:
+        type: number
+      total_granted:
+        type: number
     type: object
   models.RefreshTokenRequest:
     properties:
@@ -225,6 +478,52 @@ definitions:
     required:
     - credits
     type: object
+  models.UpdateProductRequest:
+    properties:
+      capacity_total:
+        type: number
+      description:
+        type: string
+      duration_days:
+        type: integer
+      eligibility:
+        additionalProperties: true
+        type: object
+      ends_at:
+        type: string
+      featured:
+        type: boolean
+      max_allocation:
+        type: number
+      metadata:
+        additionalProperties: true
+        type: object
+      min_allocation:
+        type: number
+      name:
+        type: string
+      reward_apr:
+        type: number
+      reward_model:
+        type: string
+      risk_level:
+        type: string
+      rules:
+        additionalProperties: true
+        type: object
+      starts_at:
+        type: string
+      status:
+        type: string
+      strategy_profiles:
+        items:
+          type: string
+        type: array
+      supported_assets:
+        items:
+          type: string
+        type: array
+    type: object
   models.UpdateProfileRequest:
     properties:
       avatar_url:
@@ -296,6 +595,13 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  models.WithdrawRequest:
+    properties:
+      amount:
+        type: number
+    required:
+    - amount
     type: object
   response.APIError:
     properties:
@@ -721,6 +1027,511 @@ paths:
       summary: Remove a device
       tags:
       - Devices
+  /api/v1/earn/admin/launchpool:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Campaign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateLaunchpoolRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create launchpool campaign (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/learn:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Campaign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateLearnCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create learn & earn campaign (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/products:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all products including drafts (admin)
+      tags:
+      - Earn Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create earn product (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/products/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updates
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update earn product (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/products/{id}/analytics:
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.ProductAnalytics'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Product analytics (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/products/{id}/participants:
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List product participants (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/admin/products/{id}/status:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Pause/resume/archive product (admin)
+      tags:
+      - Earn Admin
+  /api/v1/earn/history:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List earn transaction history
+      tags:
+      - Earn
+  /api/v1/earn/launchpool:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: List launchpool campaigns
+      tags:
+      - Earn
+  /api/v1/earn/learn:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: List learn & earn campaigns
+      tags:
+      - Earn
+  /api/v1/earn/learn/{id}/complete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Metadata
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/models.CompleteLearnRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Record learning completion for reward eligibility
+      tags:
+      - Earn
+  /api/v1/earn/participations:
+    get:
+      parameters:
+      - description: Status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List user participations
+      tags:
+      - Earn
+  /api/v1/earn/participations/{id}:
+    get:
+      parameters:
+      - description: Participation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get participation details
+      tags:
+      - Earn
+  /api/v1/earn/participations/{id}/add-funds:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Participation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Amount
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.AddFundsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Add funds to a participation
+      tags:
+      - Earn
+  /api/v1/earn/participations/{id}/exit:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Participation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reason
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/models.ExitParticipationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Exit a participation
+      tags:
+      - Earn
+  /api/v1/earn/participations/{id}/withdraw:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Participation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Amount
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.WithdrawRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Withdraw from a participation
+      tags:
+      - Earn
+  /api/v1/earn/portfolio:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.PortfolioOverview'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Earn portfolio overview
+      tags:
+      - Earn
+  /api/v1/earn/products:
+    get:
+      parameters:
+      - description: Product category
+        in: query
+        name: category
+        type: string
+      - description: Status filter
+        in: query
+        name: status
+        type: string
+      - description: Featured only
+        in: query
+        name: featured
+        type: boolean
+      - description: Supported asset
+        in: query
+        name: asset
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Per page
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: List earn products
+      tags:
+      - Earn
+  /api/v1/earn/products/{id}:
+    get:
+      parameters:
+      - description: Product ID or slug
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Get earn product by ID or slug
+      tags:
+      - Earn
+  /api/v1/earn/products/{id}/join:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Join request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.JoinProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Join an earn product
+      tags:
+      - Earn
+  /api/v1/earn/referral/rewards:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.ReferralRewardSummary'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Referral reward summary and history
+      tags:
+      - Earn
+  /api/v1/earn/rewards:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List reward history
+      tags:
+      - Earn
   /api/v1/invitations:
     get:
       description: Get all invitations sent by the current user

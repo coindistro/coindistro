@@ -327,4 +327,11 @@ const (
 	// System jobs
 	JobCleanup     = "system.cleanup"
 	JobHealthCheck = "system.health_check"
+
+	// Earn jobs
+	JobEarnRewardCalculate       = "earn.reward_calculate"
+	JobEarnParticipationReminder = "earn.participation_reminder"
+	JobEarnCompletionNotify      = "earn.completion_notify"
+	JobEarnPromoCampaign         = "earn.promo_campaign"
+	JobEarnRewardDistribute      = "earn.reward_distribute"
 )

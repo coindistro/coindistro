@@ -63,25 +63,39 @@ const (
 
 	// Notification actions
 	ActionNotificationSent Action = "notification_sent"
+
+	// Earn actions
+	ActionEarnProductCreated    Action = "earn_product_created"
+	ActionEarnProductUpdated    Action = "earn_product_updated"
+	ActionEarnJoin              Action = "earn_join"
+	ActionEarnAddFunds          Action = "earn_add_funds"
+	ActionEarnWithdraw          Action = "earn_withdraw"
+	ActionEarnExit              Action = "earn_exit"
+	ActionEarnLaunchpoolCreated Action = "earn_launchpool_created"
+	ActionEarnLearnComplete     Action = "earn_learn_complete"
 )
 
 // EntityType represents the type of entity being acted upon.
 type EntityType string
 
 const (
-	EntityUser        EntityType = "user"
-	EntityKYC         EntityType = "kyc"
-	EntityMerchant    EntityType = "merchant"
-	EntityWallet      EntityType = "wallet"
-	EntityTransaction EntityType = "transaction"
-	EntitySignal      EntityType = "signal"
-	EntityBot         EntityType = "bot"
-	EntityCourse      EntityType = "course"
-	EntitySettings    EntityType = "settings"
-	EntityFeatureFlag EntityType = "feature_flag"
-	EntityAPIKey      EntityType = "api_key"
-	EntityRole        EntityType = "role"
-	EntityPermission  EntityType = "permission"
+	EntityUser              EntityType = "user"
+	EntityKYC               EntityType = "kyc"
+	EntityMerchant          EntityType = "merchant"
+	EntityWallet            EntityType = "wallet"
+	EntityTransaction       EntityType = "transaction"
+	EntitySignal            EntityType = "signal"
+	EntityBot               EntityType = "bot"
+	EntityCourse            EntityType = "course"
+	EntitySettings          EntityType = "settings"
+	EntityFeatureFlag       EntityType = "feature_flag"
+	EntityAPIKey            EntityType = "api_key"
+	EntityRole              EntityType = "role"
+	EntityPermission        EntityType = "permission"
+	EntityEarnProduct       EntityType = "earn_product"
+	EntityEarnParticipation EntityType = "earn_participation"
+	EntityEarnLaunchpool    EntityType = "earn_launchpool"
+	EntityEarnLearn         EntityType = "earn_learn"
 )
 
 // Event represents a single audit log entry.

@@ -231,4 +231,16 @@ const (
 	// System events
 	EventSystemHealthCheck = "system.health_check"
 	EventSystemError       = "system.error"
+
+	// Earn events
+	EventEarnProductCreated         = "earn.product_created"
+	EventEarnProductUpdated         = "earn.product_updated"
+	EventEarnParticipationCreated   = "earn.participation_created"
+	EventEarnParticipationCompleted = "earn.participation_completed"
+	EventEarnParticipationExited    = "earn.participation_exited"
+	EventRewardCalculated           = "earn.reward_calculated"
+	EventRewardGranted              = "earn.reward_granted"
+	EventLaunchpoolCreated          = "earn.launchpool_created"
+	EventLearnRewardGranted         = "earn.learn_reward_granted"
+	EventReferralRewardGranted      = "earn.referral_reward_granted"
 )

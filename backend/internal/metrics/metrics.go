@@ -66,6 +66,16 @@ type Metrics struct {
 	TotalWithdrawals  *prometheus.CounterVec
 	TotalSignals      prometheus.Counter
 	ActiveBots        prometheus.Gauge
+
+	// Earn metrics
+	EarnActiveProducts      prometheus.Gauge
+	EarnActiveParticipants  prometheus.Gauge
+	EarnParticipationsTotal prometheus.Counter
+	EarnRewardCalculations  prometheus.Counter
+	EarnRewardDistributions prometheus.Counter
+	EarnProductCapacity     *prometheus.GaugeVec
+	EarnAvgAllocation       *prometheus.GaugeVec
+	EarnFailedOperations    *prometheus.CounterVec
 }
 
 // New creates and registers all Prometheus metrics.
@@ -353,6 +363,65 @@ func New() *Metrics {
 			Name:      "active_bots",
 			Help:      "Current number of active trading bots",
 		}),
+
+		// Earn metrics
+		EarnActiveProducts: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "earn",
+			Name:      "active_products",
+			Help:      "Number of active earn products",
+		}),
+		EarnActiveParticipants: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "earn",
+			Name:      "active_participants",
+			Help:      "Distinct users with active earn participations",
+		}),
+		EarnParticipationsTotal: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "earn",
+			Name:      "participations_total",
+			Help:      "Total earn participations created",
+		}),
+		EarnRewardCalculations: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "earn",
+			Name:      "reward_calculations_total",
+			Help:      "Total reward calculations performed",
+		}),
+		EarnRewardDistributions: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "earn",
+			Name:      "reward_distributions_total",
+			Help:      "Total reward distributions recorded",
+		}),
+		EarnProductCapacity: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: "earn",
+				Name:      "product_capacity_used",
+				Help:      "Capacity used per earn product",
+			},
+			[]string{"product_id"},
+		),
+		EarnAvgAllocation: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: "earn",
+				Name:      "avg_allocation",
+				Help:      "Average allocation per earn product",
+			},
+			[]string{"product_id"},
+		),
+		EarnFailedOperations: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "earn",
+				Name:      "failed_operations_total",
+				Help:      "Failed earn operations by type",
+			},
+			[]string{"operation"},
+		),
 	}
 
 	return m

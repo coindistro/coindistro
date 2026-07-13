@@ -154,6 +154,15 @@ func (m *Manager) registerDefaultFlags() {
 		{Name: "bank.enabled", Description: "Enable banking features", Enabled: false},
 		{Name: "gift_cards.enabled", Description: "Enable gift card services", Enabled: true},
 		{Name: "invest.enabled", Description: "Enable investment/staking features", Enabled: true},
+		{Name: "earn.enabled", Description: "Enable Coindistro Earn module", Enabled: true},
+		{Name: "earn.flexible.enabled", Description: "Enable Flexible Earn products", Enabled: true},
+		{Name: "earn.fixed.enabled", Description: "Enable Fixed Earn products", Enabled: true},
+		{Name: "earn.stablecoin.enabled", Description: "Enable Stablecoin Earn products", Enabled: true},
+		{Name: "earn.ai.enabled", Description: "Enable AI Smart Earn products", Enabled: true},
+		{Name: "earn.signalvault.enabled", Description: "Enable Signal Vault products", Enabled: true},
+		{Name: "earn.launchpool.enabled", Description: "Enable Launchpool campaigns", Enabled: true},
+		{Name: "earn.learn.enabled", Description: "Enable Learn & Earn campaigns", Enabled: true},
+		{Name: "earn.referral.enabled", Description: "Enable Referral Earn rewards", Enabled: true},
 		{Name: "p2p.enabled", Description: "Enable peer-to-peer trading", Enabled: true},
 		{Name: "fiat_ramp.enabled", Description: "Enable fiat on/off ramp", Enabled: true},
 		{Name: "notifications.enabled", Description: "Enable notification system", Enabled: true},
@@ -194,4 +203,15 @@ const (
 	FlagAutoVerify        = "registration.auto_verify"
 	FlagSocialLogin       = "registration.allow_social_login"
 	FlagGenesis           = "genesis.enabled"
+
+	// Earn module flags
+	FlagEarn            = "earn.enabled"
+	FlagEarnFlexible    = "earn.flexible.enabled"
+	FlagEarnFixed       = "earn.fixed.enabled"
+	FlagEarnStablecoin  = "earn.stablecoin.enabled"
+	FlagEarnAI          = "earn.ai.enabled"
+	FlagEarnSignalVault = "earn.signalvault.enabled"
+	FlagEarnLaunchpool  = "earn.launchpool.enabled"
+	FlagEarnLearn       = "earn.learn.enabled"
+	FlagEarnReferral    = "earn.referral.enabled"
 )

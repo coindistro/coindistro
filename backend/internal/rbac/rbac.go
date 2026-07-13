@@ -75,6 +75,14 @@ const (
 
 	// Notification permissions
 	PermNotificationsSend Permission = "notifications.send"
+
+	// Earn permissions
+	PermEarnRead      Permission = "earn.read"
+	PermEarnJoin      Permission = "earn.join"
+	PermEarnExit      Permission = "earn.exit"
+	PermEarnManage    Permission = "earn.manage"
+	PermEarnAnalytics Permission = "earn.analytics"
+	PermEarnAdmin     Permission = "earn.admin"
 )
 
 // RoleDefinition defines a role and its permissions.
@@ -212,6 +220,7 @@ func ParsePermission(s string) (Permission, error) {
 		PermKYCAccess: true, PermKYCApprove: true,
 		PermPaymentsRead: true, PermPaymentsWrite: true, PermPaymentsApprove: true,
 		PermNotificationsSend: true,
+		PermEarnRead:          true, PermEarnJoin: true, PermEarnExit: true, PermEarnManage: true, PermEarnAnalytics: true, PermEarnAdmin: true,
 	}
 	if !knownPermissions[perm] {
 		return "", fmt.Errorf("unknown permission: %s", s)
@@ -250,6 +259,7 @@ func (r *RBAC) registerDefaultRoles() {
 			PermKYCAccess, PermKYCApprove,
 			PermPaymentsRead, PermPaymentsWrite, PermPaymentsApprove,
 			PermNotificationsSend,
+			PermEarnRead, PermEarnJoin, PermEarnExit, PermEarnManage, PermEarnAnalytics, PermEarnAdmin,
 		},
 	}
 
@@ -268,6 +278,7 @@ func (r *RBAC) registerDefaultRoles() {
 			PermKYCAccess, PermKYCApprove,
 			PermPaymentsRead, PermPaymentsApprove,
 			PermNotificationsSend,
+			PermEarnRead, PermEarnJoin, PermEarnExit, PermEarnManage, PermEarnAnalytics, PermEarnAdmin,
 		},
 	}
 
@@ -293,6 +304,7 @@ func (r *RBAC) registerDefaultRoles() {
 			PermWalletRead,
 			PermPaymentsRead,
 			PermKYCAccess,
+			PermEarnRead, PermEarnAnalytics,
 		},
 	}
 
@@ -321,6 +333,7 @@ func (r *RBAC) registerDefaultRoles() {
 			PermSignalsRead,
 			PermBotsRead, PermBotsManage,
 			PermWalletRead, PermWalletWrite,
+			PermEarnRead, PermEarnJoin, PermEarnExit,
 		},
 	}
 
@@ -341,6 +354,7 @@ func (r *RBAC) registerDefaultRoles() {
 			PermAcademyRead,
 			PermSignalsRead,
 			PermBotsRead,
+			PermEarnRead, PermEarnJoin, PermEarnExit,
 		},
 	}
 }
