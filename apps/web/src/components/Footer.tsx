@@ -1,6 +1,6 @@
 'use client';
 
-import { Shield } from 'lucide-react';
+import Image from 'next/image';
 
 const footerLinks = {
   company: ['About Us', 'Careers', 'Blog', 'Press'],
@@ -19,8 +19,14 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] flex items-center justify-center">
-                <Shield className="w-5 h-5 text-[var(--text-primary)]" />
+              <div className="relative w-8 h-8">
+                <Image
+                  src="/coindistro-logo.png"
+                  alt="Coindistro Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
               <span className="text-xl font-bold gradient-text">Coindistro</span>
             </div>

@@ -1,0 +1,78 @@
+# ─── Coindistro Production Docker Compose ────────────
+# Usage: docker compose up -d --build
+
+services:
+  # ── Web (Next.js Landing Page) ──────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: coindistro-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://coindistro:coindistro@postgres:5432/coindistro
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - coindistro-network
+
+  # ── PostgreSQL ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: coindistro-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=coindistro
+      - POSTGRES_PASSWORD=coindistro
+      - POSTGRES_DB=coindistro
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coindistro -d coindistro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - coindistro-network
+
+  # ── Redis ───────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: coindistro-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass coindistro
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - coindistro-network
+
+# ─── Networks ─────────────────────────────────────
+networks:
+  coindistro-network:
+    driver: bridge
+    name: coindistro-network
+
+# ─── Volumes ──────────────────────────────────────
+volumes:
+  postgres_data:
+    name: coindistro-postgres-data
+  redis_data:
+    name: coindistro-redis-data

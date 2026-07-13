@@ -1,0 +1,930 @@
+basePath: /api/v1
+definitions:
+  models.ActivityLogResponse:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      device_id:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+    type: object
+  models.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/models.UserResponse'
+    type: object
+  models.ChangePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  models.DeviceResponse:
+    properties:
+      browser:
+        type: string
+      device_type:
+        type: string
+      first_seen_at:
+        type: string
+      id:
+        type: string
+      is_current:
+        type: boolean
+      is_trusted:
+        type: boolean
+      last_seen_at:
+        type: string
+      name:
+        type: string
+      operating_system:
+        type: string
+    type: object
+  models.InvitationResponse:
+    properties:
+      code:
+        type: string
+      consumed_at:
+        type: string
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      invitee_email:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.PasswordResetComplete:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
+  models.PasswordResetRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  models.ReferralDashboardResponse:
+    properties:
+      conversion_rate:
+        type: number
+      invitation_credits:
+        type: integer
+      leaderboard_rank:
+        type: integer
+      pending_invites:
+        type: integer
+      referral_code:
+        type: string
+      referral_link:
+        type: string
+      referral_tree:
+        items:
+          $ref: '#/definitions/models.ReferralNode'
+        type: array
+      rewards_earned:
+        type: number
+      successful_invites:
+        type: integer
+      total_invites:
+        type: integer
+    type: object
+  models.ReferralNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/models.ReferralNode'
+        type: array
+      date:
+        type: string
+      id:
+        type: string
+      level:
+        type: integer
+      username:
+        type: string
+    type: object
+  models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.RegisterRequest:
+    properties:
+      country:
+        type: string
+      display_name:
+        maxLength: 100
+        type: string
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      referral_code:
+        type: string
+      timezone:
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - referral_code
+    type: object
+  models.SendInvitationRequest:
+    properties:
+      email:
+        type: string
+      message:
+        maxLength: 500
+        type: string
+      role:
+        type: string
+    required:
+    - email
+    type: object
+  models.SessionResponse:
+    properties:
+      browser:
+        type: string
+      country:
+        type: string
+      device_name:
+        type: string
+      device_type:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      is_current:
+        type: boolean
+      last_activity_at:
+        type: string
+      login_at:
+        type: string
+      operating_system:
+        type: string
+    type: object
+  models.UpdateInvitationCreditsRequest:
+    properties:
+      credits:
+        minimum: 0
+        type: integer
+    required:
+    - credits
+    type: object
+  models.UpdateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      country:
+        type: string
+      display_name:
+        maxLength: 100
+        type: string
+      timezone:
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    type: object
+  models.UpdateRolesRequest:
+    properties:
+      roles:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - roles
+    type: object
+  models.UpdateUserStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  models.UserResponse:
+    properties:
+      avatar_url:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      genesis_number:
+        type: integer
+      id:
+        type: string
+      is_founder:
+        type: boolean
+      is_genesis:
+        type: boolean
+      is_verified:
+        type: boolean
+      last_login_at:
+        type: string
+      referral_code:
+        type: string
+      referred_by:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      timezone:
+        type: string
+      username:
+        type: string
+    type: object
+  response.APIError:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  response.APIResponse:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/response.APIError'
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/response.Meta'
+      success:
+        type: boolean
+    type: object
+  response.Meta:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@coindistro.com
+    name: Coindistro Support
+    url: https://coindistro.com/support
+  description: Coindistro — One Platform. Everything Crypto. API backend for Africa's
+    next-generation crypto financial ecosystem.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://coindistro.com/terms
+  title: Coindistro API
+  version: 1.0.0
+paths:
+  /api/v1/activity:
+    get:
+      description: Get security and activity history for the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.ActivityLogResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get activity log
+      tags:
+      - Security
+  /api/v1/admin/users:
+    get:
+      description: Get paginated list of all users
+      parameters:
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all users (Admin)
+      tags:
+      - Admin
+  /api/v1/admin/users/{id}/credits:
+    put:
+      description: Update a user's invitation credit balance
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Credits
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateInvitationCreditsRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update invitation credits (Admin)
+      tags:
+      - Admin
+  /api/v1/admin/users/{id}/roles:
+    put:
+      description: Update a user's role assignments
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New roles
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateRolesRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user roles (Admin)
+      tags:
+      - Admin
+  /api/v1/admin/users/{id}/status:
+    put:
+      description: Update a user's account status (active, suspended, banned)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserStatusRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user status (Admin)
+      tags:
+      - Admin
+  /api/v1/auth/change-password:
+    put:
+      consumes:
+      - application/json
+      description: Change your current password
+      parameters:
+      - description: Current and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - Security
+  /api/v1/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Send a password reset link to your email
+      parameters:
+      - description: Email address
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PasswordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Request password reset
+      tags:
+      - Authentication
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Login to your account
+      tags:
+      - Authentication
+  /api/v1/auth/logout:
+    post:
+      description: Terminate the current session
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout
+      tags:
+      - Authentication
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get a new access token using a refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Refresh access token
+      tags:
+      - Authentication
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register with referral code. Invite-only when enabled.
+      parameters:
+      - description: Registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Register a new account
+      tags:
+      - Authentication
+  /api/v1/auth/resend-verification:
+    post:
+      description: Resend the email verification link
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Resend verification email
+      tags:
+      - Authentication
+  /api/v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Complete password reset with token and new password
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PasswordResetComplete'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Reset password
+      tags:
+      - Authentication
+  /api/v1/auth/verify-email:
+    get:
+      description: Verify email using the token sent to your email
+      parameters:
+      - description: Verification token
+        in: query
+        name: token
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Verify email address
+      tags:
+      - Authentication
+  /api/v1/devices:
+    get:
+      description: Get all trusted devices for the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.DeviceResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List trusted devices
+      tags:
+      - Devices
+  /api/v1/devices/{id}:
+    delete:
+      description: Remove a trusted device by ID
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a device
+      tags:
+      - Devices
+  /api/v1/invitations:
+    get:
+      description: Get all invitations sent by the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.InvitationResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List invitations
+      tags:
+      - Invitations
+    post:
+      consumes:
+      - application/json
+      description: Send an invitation email. Consumes one invitation credit.
+      parameters:
+      - description: Invitation details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SendInvitationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.InvitationResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Send invitation
+      tags:
+      - Invitations
+  /api/v1/referrals/dashboard:
+    get:
+      description: Get referral code, stats, and tree
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.ReferralDashboardResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get referral dashboard
+      tags:
+      - Referrals
+  /api/v1/sessions:
+    get:
+      description: Get all active sessions for the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.SessionResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List active sessions
+      tags:
+      - Sessions
+  /api/v1/sessions/{id}:
+    delete:
+      description: Terminate a specific session by ID
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Terminate a session
+      tags:
+      - Sessions
+  /api/v1/sessions/terminate-all:
+    post:
+      description: Terminate all sessions except the current one
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Terminate all sessions
+      tags:
+      - Sessions
+  /api/v1/users/check-email:
+    get:
+      description: Check if an email is already registered
+      parameters:
+      - description: Email to check
+        in: query
+        name: email
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Check email availability
+      tags:
+      - Users
+  /api/v1/users/check-username:
+    get:
+      description: Check if a username is already taken
+      parameters:
+      - description: Username to check
+        in: query
+        name: username
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+      summary: Check username availability
+      tags:
+      - Users
+  /api/v1/users/me:
+    get:
+      description: Returns the authenticated user's profile
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Update profile fields like display_name, username, country, timezone
+      parameters:
+      - description: Profile fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Update current user profile
+      tags:
+      - Users
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  BearerAuth:
+    description: Enter the token with the `Bearer ` prefix, e.g. "Bearer abcde12345".
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

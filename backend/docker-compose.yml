@@ -1,0 +1,89 @@
+# ─── Coindistro Backend Docker Compose ─────────────────
+# Usage: docker compose up -d --build
+
+services:
+  # ── API (Go Backend) ──────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coindistro-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - COINDISTRO_ENV=development
+      - COINDISTRO_DB_HOST=postgres
+      - COINDISTRO_DB_PORT=5432
+      - COINDISTRO_DB_USER=coindistro
+      - COINDISTRO_DB_PASSWORD=coindistro
+      - COINDISTRO_DB_NAME=coindistro
+      - COINDISTRO_REDIS_HOST=redis
+      - COINDISTRO_REDIS_PORT=6379
+      - COINDISTRO_REDIS_PASSWORD=coindistro
+      - COINDISTRO_JWT_ACCESS_SECRET=dev-access-secret-change-in-production
+      - COINDISTRO_JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production
+      - COINDISTRO_LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - coindistro-network
+    volumes:
+      - ./configs:/app/configs:ro
+
+  # ── PostgreSQL ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: coindistro-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=coindistro
+      - POSTGRES_PASSWORD=coindistro
+      - POSTGRES_DB=coindistro
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coindistro -d coindistro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - coindistro-network
+
+  # ── Redis ───────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: coindistro-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass coindistro
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - coindistro-network
+
+# ─── Networks ─────────────────────────────────────
+networks:
+  coindistro-network:
+    driver: bridge
+    name: coindistro-network
+
+# ─── Volumes ──────────────────────────────────────
+volumes:
+  postgres_data:
+    name: coindistro-postgres-data
+  redis_data:
+    name: coindistro-redis-data

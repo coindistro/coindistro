@@ -1,0 +1,124 @@
+# ─── Coindistro Backend Configuration ──────────────────
+
+app:
+  name: "coindistro"
+  version: "0.2.0"
+  environment: "development" # development | staging | production
+  debug: true
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 10
+  write_timeout: 10
+  idle_timeout: 60
+  max_request_size: 10 # MB
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "coindistro"
+  password: "coindistro"
+  dbname: "coindistro"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime: 5 # minutes
+  health_check_interval: 30 # seconds
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: "coindistro"
+  db: 0
+  dial_timeout: 5 # seconds
+  read_timeout: 3 # seconds
+  write_timeout: 3 # seconds
+  pool_size: 10
+  min_idle_conns: 5
+
+auth:
+  access_token_secret: "change-me-in-production"
+  refresh_token_secret: "change-me-in-production-too"
+  access_token_ttl: 15 # minutes
+  refresh_token_ttl: 10080 # minutes (7 days)
+  issuer: "coindistro"
+
+rate_limiter:
+  enabled: true
+  requests_per_minute: 60
+  burst: 100
+
+cors:
+  allowed_origins:
+    - "http://localhost:3000"
+    - "https://coindistro.com"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "PATCH"
+    - "DELETE"
+    - "OPTIONS"
+  allowed_headers:
+    - "Origin"
+    - "Content-Type"
+    - "Accept"
+    - "Authorization"
+    - "X-Request-ID"
+  allow_credentials: true
+  max_age: 86400 # seconds
+
+logging:
+  level: "info" # debug | info | warn | error | panic | fatal
+  encoding: "json" # json | console
+  output_paths:
+    - "stdout"
+  error_output_paths:
+    - "stderr"
+
+# ─── Telemetry / Distributed Tracing (OpenTelemetry) ──
+telemetry:
+  enabled: false
+  service_name: "coindistro"
+  endpoint: "localhost:4318"
+  sample_rate: 0.1
+
+# ─── Email ────────────────────────────────────────────
+email:
+  provider: "noop" # smtp | noop
+  smtp:
+    host: "localhost"
+    port: 587
+    username: ""
+    password: ""
+    from: "noreply@coindistro.com"
+    from_name: "Coindistro"
+    use_tls: false
+
+# ─── Storage ──────────────────────────────────────────
+storage:
+  provider: "local" # local | s3 | r2 | minio
+  base_path: "./uploads"
+  base_url: ""
+
+# ─── Feature Flags ────────────────────────────────────
+feature_flags:
+  enabled: true
+  flags: {}
+
+# ─── Workers ──────────────────────────────────────────
+workers:
+  enabled: true
+  num_workers: 5
+  queue_size: 100
+
+# ─── Scheduler ────────────────────────────────────────
+scheduler:
+  enabled: true
+
+# ─── Monitoring ───────────────────────────────────────
+monitoring:
+  prometheus_enabled: true
+  grafana_endpoint: ""
+  loki_endpoint: ""
