@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { Search, X } from "lucide-react";
-import { Input, type InputProps } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Input, type InputProps } from "../../components/ui/input";
+import { cn } from "../../lib/utils";
 
 export interface SearchInputProps extends InputProps {
   onClear?: () => void;

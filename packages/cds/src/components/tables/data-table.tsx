@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/feedback/empty-state";
-import { Button } from "@/components/ui/button";
+import { cn } from "../../lib/utils";
+import { Skeleton } from "../../components/ui/skeleton";
+import { EmptyState } from "../../components/feedback/empty-state";
+import { Button } from "../../components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface DataTableColumn<T> {

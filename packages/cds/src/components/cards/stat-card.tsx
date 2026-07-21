@@ -1,7 +1,7 @@
 import * as React from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatPercent } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { cn, formatPercent } from "../../lib/utils";
 
 export interface StatCardProps {
   title: string;

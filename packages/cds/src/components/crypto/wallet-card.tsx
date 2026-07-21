@@ -1,7 +1,7 @@
 import { Wallet } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { cn, formatCurrency, formatCrypto } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { cn, formatCurrency, formatCrypto } from "../../lib/utils";
 
 export interface WalletBalance {
   asset: string;

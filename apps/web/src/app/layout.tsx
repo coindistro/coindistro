@@ -1,35 +1,29 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import ThemeProvider from "@/components/ThemeProvider";
+import { AppProviders } from "@/features/shared/providers/app-providers";
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--cds-font-sans",
 });
 
 export const metadata: Metadata = {
-  title: "Coindistro — One Platform. Everything Crypto.",
-  description: "Trade, learn, automate, invest, and spend digital assets through Africa's next-generation crypto financial ecosystem.",
-  keywords: "crypto, trading, bitcoin, ethereum, blockchain, fintech, africa, exchange, payment gateway",
-  openGraph: {
-    title: "Coindistro — One Platform. Everything Crypto.",
-    description: "Africa's next-generation crypto financial ecosystem.",
-    type: "website",
+  title: {
+    default: "Coindistro — One Platform. Everything Crypto.",
+    template: "%s · Coindistro",
   },
+  description:
+    "Trade, learn, automate, invest, and spend digital assets through Africa's next-generation crypto financial ecosystem.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

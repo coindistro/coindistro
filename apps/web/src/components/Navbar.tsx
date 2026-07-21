@@ -3,22 +3,23 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Menu, X, Sun, Moon } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+import { useTheme } from '@coindistro/cds';
 
 const navLinks = [
-  { name: 'Products', href: '#ecosystem' },
-  { name: 'Markets', href: '#market' },
-  { name: 'Signals', href: '#signals' },
-  { name: 'Academy', href: '#academy' },
-  { name: 'Security', href: '#security' },
-  { name: 'Roadmap', href: '#roadmap' },
+  { name: 'Products', href: '/#ecosystem' },
+  { name: 'Markets', href: '/#market' },
+  { name: 'Signals', href: '/#signals' },
+  { name: 'Academy', href: '/academy' },
+  { name: 'Security', href: '/#security' },
+  { name: 'Roadmap', href: '/#roadmap' },
 ];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -26,7 +27,8 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const isDark = theme === 'dark';
+  const isDark = resolvedTheme === 'dark';
+  const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
 
   return (
     <motion.nav
@@ -101,13 +103,18 @@ export default function Navbar() {
               </AnimatePresence>
             </button>
 
-            {/* CTA */}
-            <a
-              href="#"
+            <Link
+              href="/login"
+              className="px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/register"
               className="px-5 py-2.5 text-sm font-medium text-[var(--text-primary)] bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-lg hover:opacity-90 transition-all duration-200 glow-purple"
             >
               Get Started
-            </a>
+            </Link>
           </div>
 
           {/* Mobile: Theme toggle + hamburger */}

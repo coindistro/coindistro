@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CdsDonutChart, type DonutSlice } from "@/components/charts/donut-chart";
-import { formatCurrency, formatPercent } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { CdsDonutChart, type DonutSlice } from "../../components/charts/donut-chart";
+import { formatCurrency, formatPercent } from "../../lib/utils";
+import { cn } from "../../lib/utils";
 
 export interface PortfolioSummaryProps {
   totalValue: number;

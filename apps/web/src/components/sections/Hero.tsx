@@ -72,7 +72,7 @@ export default function Hero() {
             transition={{ duration: 0.7, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
           >
-            <a href="#" className="px-8 py-4 text-base font-semibold text-[var(--text-primary)] bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-xl hover:opacity-90 transition-all duration-200 glow-purple flex items-center gap-2">
+            <a href="/register" className="px-8 py-4 text-base font-semibold text-[var(--text-primary)] bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-xl hover:opacity-90 transition-all duration-200 glow-purple flex items-center gap-2">
               Get Started <ArrowRight className="w-5 h-5" />
             </a>
             <a href="#ecosystem" className="px-8 py-4 text-base font-semibold text-[var(--text-primary)] glass rounded-xl hover:bg-[var(--card-bg)]/50 transition-all duration-200 flex items-center gap-2">

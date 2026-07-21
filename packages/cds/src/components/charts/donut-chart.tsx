@@ -1,7 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 export interface DonutSlice {
   name: string;

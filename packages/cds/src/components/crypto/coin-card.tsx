@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn, formatCurrency, formatPercent } from "@/lib/utils";
-import { cdsCryptoAssets } from "@/tokens";
+import { Card, CardContent } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { cn, formatCurrency, formatPercent } from "../../lib/utils";
+import { cdsCryptoAssets } from "../../tokens";
 
 export interface CoinCardProps {
   symbol: string;

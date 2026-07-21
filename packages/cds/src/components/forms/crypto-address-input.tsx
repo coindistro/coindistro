@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { Copy, Check } from "lucide-react";
-import { Input, type InputProps } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Input, type InputProps } from "../../components/ui/input";
+import { cn } from "../../lib/utils";
 
 export interface CryptoAddressInputProps extends Omit<InputProps, "onCopy"> {
   onAddressCopy?: (value: string) => void;

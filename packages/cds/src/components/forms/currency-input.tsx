@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Input, type InputProps } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Input, type InputProps } from "../../components/ui/input";
+import { cn } from "../../lib/utils";
 
 export interface CurrencyInputProps extends Omit<InputProps, "type" | "onChange"> {
   currency?: string;

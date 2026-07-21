@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 const statusDotVariants = cva("inline-block h-2 w-2 rounded-full", {
   variants: {

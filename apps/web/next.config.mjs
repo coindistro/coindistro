@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  reactStrictMode: true,
+  transpilePackages: ["@coindistro/cds"],
   experimental: {
-    optimizeCss: true,
+    optimizePackageImports: ["lucide-react", "@coindistro/cds"],
   },
   images: {
-    unoptimized: false,
+    remotePatterns: [],
   },
 };
 

@@ -1,4 +1,4 @@
-import { cn, formatCurrency, formatPercent } from "@/lib/utils";
+import { cn, formatCurrency, formatPercent } from "../../lib/utils";
 
 export interface PriceTickerProps {
   symbol: string;

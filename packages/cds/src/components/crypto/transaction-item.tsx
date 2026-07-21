@@ -1,6 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, RefreshCw } from "lucide-react";
-import { cn, formatCrypto } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { cn, formatCrypto } from "../../lib/utils";
+import { Badge } from "../../components/ui/badge";
 
 export type TransactionType = "deposit" | "withdrawal" | "transfer" | "trade" | "reward";
 export type TransactionStatus = "pending" | "completed" | "failed";

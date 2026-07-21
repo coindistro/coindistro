@@ -1,10 +1,10 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { cdsTypography, type CdsTypographyVariant } from "@/tokens";
+import { cn } from "../../lib/utils";
+import { cdsTypography, type CdsTypographyVariant } from "../../tokens";
 
 export interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
   variant?: CdsTypographyVariant;
-  as?: keyof JSX.IntrinsicElements;
+  as?: keyof React.JSX.IntrinsicElements;
 }
 
 export function Typography({
@@ -19,7 +19,7 @@ export function Typography({
       ? variant === "display"
         ? "h1"
         : variant
-      : "p")) as keyof JSX.IntrinsicElements;
+      : "p")) as keyof React.JSX.IntrinsicElements;
 
   return React.createElement(
     Comp,

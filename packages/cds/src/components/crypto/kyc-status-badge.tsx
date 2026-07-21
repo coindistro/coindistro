@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "../../components/ui/badge";
 
 export type KycStatus = "none" | "pending" | "approved" | "rejected" | "needs_review";
 
