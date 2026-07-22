@@ -27,7 +27,10 @@ import { adminNavItems } from "@/features/admin/nav";
 export function AdminChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
+  const roleLabel =
+    user?.roles?.find((r) => ["super_admin", "admin", "moderator"].includes(r)) ||
+    (isAdmin ? "admin" : "staff");
   const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -79,7 +82,9 @@ export function AdminChrome({ children }: { children: React.ReactNode }) {
       }
       actions={
         <div className="flex items-center gap-2">
-          <Badge variant="danger">Admin</Badge>
+          <Badge variant="danger" className="capitalize">
+            {roleLabel.replace("_", " ")}
+          </Badge>
           <Button
             variant="ghost"
             size="icon-sm"

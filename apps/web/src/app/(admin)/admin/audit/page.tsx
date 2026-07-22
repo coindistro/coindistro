@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Audit Logs" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Audit Logs"
-      description="Security and compliance audit trail."
+      description="Immutable audit trail for sensitive actions."
       module="admin-audit"
+      status="Planned"
+      expectedFeatures={[
+    "Search and filter",
+    "Export",
+    "Integrity checks",
+      ]}
     />
   );
 }

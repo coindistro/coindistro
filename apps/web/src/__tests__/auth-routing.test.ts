@@ -34,11 +34,11 @@ const protectedRoutes = [
 ];
 
 const adminRoutes = [
-  { path: "/admin", roles: ["admin", "super_admin"] },
-  { path: "/admin/users", roles: ["admin", "super_admin"] },
-  { path: "/admin/genesis", roles: ["admin", "super_admin"] },
-  { path: "/admin/referrals", roles: ["admin", "super_admin"] },
-  { path: "/admin/p2p", roles: ["admin", "super_admin"] },
+  { path: "/admin", roles: ["admin", "super_admin", "moderator"] },
+  { path: "/admin/users", roles: ["admin", "super_admin", "moderator"] },
+  { path: "/admin/genesis", roles: ["admin", "super_admin", "moderator"] },
+  { path: "/admin/referrals", roles: ["admin", "super_admin", "moderator"] },
+  { path: "/admin/p2p", roles: ["admin", "super_admin", "moderator"] },
 ];
 
 describe("Auth Routing", () => {

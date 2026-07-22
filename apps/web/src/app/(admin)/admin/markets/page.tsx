@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Markets Admin" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Markets Admin"
-      description="Pairs, fees, and market configuration."
+      description="Market listings and trading pairs."
       module="admin-markets"
+      status="Planned"
+      expectedFeatures={[
+    "Pair configuration",
+    "Market status",
+    "Fee schedules",
+      ]}
     />
   );
 }

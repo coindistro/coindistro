@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Wallet" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Wallet"
-      description="Balances, deposits, withdrawals, and ledger history."
+      description="Deposits, withdrawals, and balances."
       module="wallet"
+      status="Planned"
+      expectedFeatures={[
+    "Multi-asset balances",
+    "Deposit addresses",
+    "Withdrawal security",
+      ]}
     />
   );
 }

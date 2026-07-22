@@ -1,13 +1,7 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { AdminUsersPage } from "@/features/admin/admin-users-page";
 
 export const metadata = { title: "Users" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Users"
-      description="Identity users, roles, and status management."
-      module="admin-users"
-    />
-  );
+  return <AdminUsersPage />;
 }

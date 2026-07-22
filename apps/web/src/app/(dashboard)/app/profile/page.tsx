@@ -1,13 +1,7 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ProfilePage } from "@/features/dashboard/profile-page";
 
 export const metadata = { title: "Profile" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Profile"
-      description="Identity profile, devices, and security settings."
-      module="profile"
-    />
-  );
+  return <ProfilePage />;
 }

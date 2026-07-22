@@ -1,13 +1,7 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { AdminHealthPage } from "@/features/admin/admin-health-page";
 
 export const metadata = { title: "System Health" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="System Health"
-      description="Service health, readiness, and dependencies."
-      module="admin-health"
-    />
-  );
+  return <AdminHealthPage />;
 }

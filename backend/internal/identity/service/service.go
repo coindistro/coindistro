@@ -717,6 +717,136 @@ func (s *Service) CheckUsernameAvailability(ctx context.Context, username string
 	return !taken, nil
 }
 
+// AdminListUsers returns a paginated list of users for administrators.
+func (s *Service) AdminListUsers(ctx context.Context, status string, page, perPage int) ([]*models.AdminUserSummary, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 100 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+
+	users, err := s.store.ListUsers(ctx, status, perPage, offset)
+	if err != nil {
+		s.logger.Error("admin list users failed", zap.Error(err))
+		return nil, 0, apperrors.ErrInternalServer
+	}
+	total, err := s.store.CountUsers(ctx, status)
+	if err != nil {
+		s.logger.Error("admin count users failed", zap.Error(err))
+		return nil, 0, apperrors.ErrInternalServer
+	}
+
+	summaries := make([]*models.AdminUserSummary, 0, len(users))
+	for _, u := range users {
+		summaries = append(summaries, toAdminUserSummary(u))
+	}
+	return summaries, total, nil
+}
+
+// GetPlatformStats returns aggregate identity metrics for the admin dashboard.
+func (s *Service) GetPlatformStats(ctx context.Context) (*models.PlatformStats, error) {
+	stats := &models.PlatformStats{}
+
+	total, err := s.store.CountUsers(ctx, "")
+	if err != nil {
+		s.logger.Error("platform stats total users", zap.Error(err))
+		return nil, apperrors.ErrInternalServer
+	}
+	stats.TotalUsers = total
+
+	active, err := s.store.CountUsers(ctx, "active")
+	if err != nil {
+		s.logger.Error("platform stats active users", zap.Error(err))
+		return nil, apperrors.ErrInternalServer
+	}
+	stats.ActiveUsers = active
+
+	verified, err := s.store.CountVerifiedUsers(ctx)
+	if err != nil {
+		s.logger.Error("platform stats verified users", zap.Error(err))
+		return nil, apperrors.ErrInternalServer
+	}
+	stats.VerifiedUsers = verified
+
+	genesis, err := s.store.CountActiveGenesisMembers(ctx)
+	if err != nil {
+		s.logger.Error("platform stats genesis", zap.Error(err))
+		return nil, apperrors.ErrInternalServer
+	}
+	stats.GenesisMembers = genesis
+
+	referrals, err := s.store.CountTotalReferrals(ctx)
+	if err != nil {
+		s.logger.Warn("platform stats referrals", zap.Error(err))
+		referrals = 0
+	}
+	stats.TotalReferrals = referrals
+
+	invitations, err := s.store.CountTotalInvitations(ctx)
+	if err != nil {
+		s.logger.Warn("platform stats invitations", zap.Error(err))
+		invitations = 0
+	}
+	stats.TotalInvitations = invitations
+
+	recentRegs, err := s.store.ListUsers(ctx, "", 8, 0)
+	if err != nil {
+		s.logger.Warn("platform stats recent registrations", zap.Error(err))
+	} else {
+		for _, u := range recentRegs {
+			stats.RecentRegistrations = append(stats.RecentRegistrations, toAdminUserSummary(u))
+		}
+	}
+
+	recentLogins, err := s.store.ListRecentLogins(ctx, 8)
+	if err != nil {
+		s.logger.Warn("platform stats recent logins", zap.Error(err))
+	} else {
+		for _, u := range recentLogins {
+			stats.RecentLogins = append(stats.RecentLogins, toAdminUserSummary(u))
+		}
+	}
+
+	activity, err := s.store.ListRecentActivity(ctx, 15)
+	if err != nil {
+		s.logger.Warn("platform stats recent activity", zap.Error(err))
+	} else {
+		for _, a := range activity {
+			stats.RecentActivity = append(stats.RecentActivity, &models.ActivityLogResponse{
+				ID:        a.ID,
+				Action:    a.Action,
+				IPAddress: a.IPAddress,
+				DeviceID:  a.DeviceID,
+				Details:   a.Details,
+				CreatedAt: a.CreatedAt,
+			})
+		}
+	}
+
+	if gc, err := s.store.GetGenesisConfig(ctx); err == nil {
+		stats.GenesisConfig = gc
+	}
+
+	return stats, nil
+}
+
+func toAdminUserSummary(u *models.User) *models.AdminUserSummary {
+	return &models.AdminUserSummary{
+		ID:          u.ID,
+		Email:       u.Email,
+		Username:    u.Username,
+		DisplayName: u.DisplayName,
+		Status:      u.Status,
+		IsVerified:  u.EmailVerifiedAt != nil,
+		IsGenesis:   u.IsGenesis,
+		Roles:       u.Roles,
+		LastLoginAt: u.LastLoginAt,
+		CreatedAt:   u.CreatedAt,
+	}
+}
+
 // ─── Internal helpers ─────────────────────────────────
 
 func (s *Service) generateReferralCode(ctx context.Context) string {

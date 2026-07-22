@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Signals Admin" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Signals Admin"
-      description="Signal publishers and performance."
+      description="Publish and moderate trading signals."
       module="admin-signals"
+      status="Planned"
+      expectedFeatures={[
+    "Signal pipeline",
+    "Provider management",
+    "Quality scores",
+      ]}
     />
   );
 }

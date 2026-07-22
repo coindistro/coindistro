@@ -19,12 +19,14 @@ import {
   registerSchema,
   type RegisterValues,
 } from "@/features/authentication/schemas";
-import { ApiError } from "@/lib/api/types";
+import { ApiError, postLoginPath } from "@/lib/api/types";
+import { useToast } from "@/features/shared/providers/toast-provider";
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<RegisterValues>({
@@ -42,14 +44,18 @@ export default function RegisterPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      await registerUser({
+      const user = await registerUser({
         email: values.email,
         password: values.password,
         username: values.username || undefined,
         display_name: values.display_name || undefined,
         referral_code: values.referral_code,
       });
-      router.replace("/app/dashboard");
+      toast({
+        message: "Account created successfully. Welcome to Coindistro!",
+        variant: "success",
+      });
+      router.replace(postLoginPath(user.roles));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Registration failed");
     }

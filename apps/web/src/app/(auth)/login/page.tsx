@@ -16,12 +16,14 @@ import {
 } from "@coindistro/cds";
 import { useAuth } from "@/features/authentication/auth-provider";
 import { loginSchema, type LoginValues } from "@/features/authentication/schemas";
-import { ApiError } from "@/lib/api/types";
+import { ApiError, postLoginPath } from "@/lib/api/types";
+import { useToast } from "@/features/shared/providers/toast-provider";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(
     params.get("reason") === "session_expired"
       ? "Your session expired. Please sign in again."
@@ -36,9 +38,12 @@ export default function LoginPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      await login(values.email, values.password);
-      const next = params.get("next") || "/app/dashboard";
-      router.replace(next);
+      const user = await login(values.email, values.password);
+      toast({
+        message: `Welcome back${user.display_name ? `, ${user.display_name}` : ""}`,
+        variant: "success",
+      });
+      router.replace(postLoginPath(user.roles, params.get("next")));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Login failed");
     }

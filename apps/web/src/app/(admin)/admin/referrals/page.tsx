@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Referrals" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Referrals"
-      description="Referral graph and reward operations."
+      description="Platform-wide referral analytics."
       module="admin-referrals"
+      status="Planned"
+      expectedFeatures={[
+    "Network graph",
+    "Reward ledger",
+    "Fraud controls",
+      ]}
     />
   );
 }

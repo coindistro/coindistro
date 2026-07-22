@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "AI Bots" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="AI Bots"
-      description="Grid, DCA, and AI bot management."
+      description="Automated trading bots."
       module="ai-bots"
+      status="Planned"
+      expectedFeatures={[
+    "Bot marketplace",
+    "Strategy configuration",
+    "Performance analytics",
+      ]}
     />
   );
 }

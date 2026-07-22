@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "P2P" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="P2P"
-      description="Peer-to-peer offers and order chat will plug into this route."
+      description="Peer-to-peer trading marketplace."
       module="p2p"
+      status="Planned"
+      expectedFeatures={[
+    "Buy and sell ads",
+    "Escrow flow",
+    "Dispute resolution",
+      ]}
     />
   );
 }

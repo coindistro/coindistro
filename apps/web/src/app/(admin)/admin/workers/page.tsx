@@ -1,13 +1,7 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { AdminWorkersPage } from "@/features/admin/admin-workers-page";
 
 export const metadata = { title: "Workers" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Workers"
-      description="Background job pools and queues."
-      module="admin-workers"
-    />
-  );
+  return <AdminWorkersPage />;
 }

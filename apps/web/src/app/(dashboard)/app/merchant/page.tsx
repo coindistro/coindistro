@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Merchant" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Merchant"
-      description="Merchant accounts, invoices, and settlement."
+      description="Accept crypto payments as a merchant."
       module="merchant"
+      status="Planned"
+      expectedFeatures={[
+    "Payment links",
+    "Settlement",
+    "Merchant dashboard",
+      ]}
     />
   );
 }

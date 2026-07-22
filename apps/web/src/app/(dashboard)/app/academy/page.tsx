@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Academy" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Academy"
-      description="Courses, progress, and certificates."
+      description="Learn crypto with structured courses."
       module="academy"
+      status="Planned"
+      expectedFeatures={[
+    "Course catalog",
+    "Progress tracking",
+    "Certificates",
+      ]}
     />
   );
 }

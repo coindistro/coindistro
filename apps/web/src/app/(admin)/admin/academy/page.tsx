@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Academy Admin" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Academy Admin"
-      description="Courses, instructors, and certifications."
+      description="Manage courses and instructors."
       module="admin-academy"
+      status="Planned"
+      expectedFeatures={[
+    "Course publishing",
+    "Enrollment metrics",
+    "Content moderation",
+      ]}
     />
   );
 }

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -538,8 +540,46 @@ func (h *Handlers) CheckUsernameAvailability(c *gin.Context) {
 // @Success 200 {object} response.APIResponse
 // @Router /api/v1/admin/users [get]
 func (h *Handlers) AdminListUsers(c *gin.Context) {
-	// Implementation delegated to middleware-protected admin routes
-	response.OK(c, "List users - not implemented", nil)
+	if h.svc == nil {
+		response.InternalServerError(c, "Identity service unavailable")
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	status := c.Query("status")
+
+	users, total, err := h.svc.AdminListUsers(c.Request.Context(), status, page, perPage)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	totalPages := 0
+	if perPage > 0 {
+		totalPages = (total + perPage - 1) / perPage
+	}
+	response.SuccessWithMeta(c, 200, "Users retrieved", users, &response.Meta{
+		Page: page, PerPage: perPage, Total: total, TotalPages: totalPages,
+	})
+}
+
+// AdminPlatformStats returns aggregate platform metrics for the admin overview.
+// @Summary Platform statistics (Admin)
+// @Tags Admin
+// @Security BearerAuth
+// @Success 200 {object} response.APIResponse{data=models.PlatformStats}
+// @Router /api/v1/admin/stats [get]
+func (h *Handlers) AdminPlatformStats(c *gin.Context) {
+	if h.svc == nil {
+		response.InternalServerError(c, "Identity service unavailable")
+		return
+	}
+	stats, err := h.svc.GetPlatformStats(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, "Platform statistics retrieved", stats)
 }
 
 // AdminUpdateUserStatus updates a user's status (admin).
@@ -587,6 +627,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
+		// Refresh must be public — access tokens may already be expired.
+		auth.POST("/refresh", h.RefreshToken)
 		auth.GET("/verify-email", h.VerifyEmail)
 		auth.POST("/forgot-password", h.RequestPasswordReset)
 		auth.POST("/reset-password", h.ResetPassword)
@@ -597,7 +639,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 func RegisterProtectedAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	auth := rg.Group("/auth")
 	{
-		auth.POST("/refresh", h.RefreshToken)
 		auth.POST("/logout", h.Logout)
 		auth.POST("/resend-verification", h.ResendVerification)
 		auth.PUT("/change-password", h.ChangePassword)
@@ -669,6 +710,7 @@ func RegisterSecurityRoutes(rg *gin.RouterGroup, h *Handlers) {
 // RegisterAdminRoutes registers admin identity routes.
 func RegisterAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 	rg.GET("/users", h.AdminListUsers)
+	rg.GET("/stats", h.AdminPlatformStats)
 	rg.PUT("/users/:id/status", h.AdminUpdateUserStatus)
 	rg.PUT("/users/:id/roles", h.AdminUpdateRoles)
 	rg.PUT("/users/:id/credits", h.AdminUpdateInvitationCredits)

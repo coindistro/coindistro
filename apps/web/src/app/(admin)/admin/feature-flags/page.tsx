@@ -1,13 +1,7 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { AdminFeatureFlagsPage } from "@/features/admin/admin-feature-flags-page";
 
 export const metadata = { title: "Feature Flags" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Feature Flags"
-      description="Runtime feature flag management."
-      module="admin-flags"
-    />
-  );
+  return <AdminFeatureFlagsPage />;
 }

@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Trade" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Trade"
-      description="Spot, futures, and order management shell."
+      description="Spot trading interface."
       module="trade"
+      status="Planned"
+      expectedFeatures={[
+    "Order book",
+    "Limit and market orders",
+    "Trade history",
+      ]}
     />
   );
 }

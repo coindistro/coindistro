@@ -53,7 +53,7 @@ async function tryRefresh(): Promise<boolean> {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken || ""}`,
+          Accept: "application/json",
         },
         body: JSON.stringify({ refresh_token: refreshToken }),
       });

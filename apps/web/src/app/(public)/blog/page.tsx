@@ -1,4 +1,4 @@
-﻿import { SimplePublicPage } from "@/features/public/simple-page";
+import { SimplePublicPage } from "@/features/public/simple-page";
 
 export const metadata = { title: "Blog" };
 

@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Genesis Members" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Genesis Members"
-      description="Genesis program membership and badges."
+      description="Manage the Genesis membership program."
       module="admin-genesis"
+      status="Planned"
+      expectedFeatures={[
+    "Member directory",
+    "Slot allocation",
+    "Genesis analytics",
+      ]}
     />
   );
 }

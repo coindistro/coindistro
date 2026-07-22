@@ -271,7 +271,7 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	// Setup routes
-	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, earnHandlers)
+	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, earnHandlers, workerPool, sched)
 
 	// Create HTTP server
 	httpServer := &http.Server{

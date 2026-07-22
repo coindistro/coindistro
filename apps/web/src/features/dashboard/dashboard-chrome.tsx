@@ -18,7 +18,7 @@ import {
   Topbar,
   useTheme,
 } from "@coindistro/cds";
-import { Bell, Command, LogOut, Moon, Search, Sun, User } from "lucide-react";
+import { Bell, Command, LogOut, Moon, Search, Shield, Sun, User } from "lucide-react";
 import { useAuth } from "@/features/authentication/auth-provider";
 import { userNavItems } from "@/features/dashboard/nav";
 import { Breadcrumbs } from "@/features/shared/components/breadcrumbs";
@@ -27,7 +27,7 @@ import { useCommandPalette } from "@/features/shared/providers/command-palette-p
 export function UserDashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -129,6 +129,11 @@ export function UserDashboardChrome({ children }: { children: React.ReactNode })
               <DropdownMenuItem onClick={() => router.push("/app/settings")}>
                 Settings
               </DropdownMenuItem>
+              {isAdmin ? (
+                <DropdownMenuItem onClick={() => router.push("/admin")}>
+                  <Shield className="mr-2 h-4 w-4" /> Admin portal
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void logout()}>
                 <LogOut className="mr-2 h-4 w-4" /> Log out

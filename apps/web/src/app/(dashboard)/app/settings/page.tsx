@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Settings" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Settings"
-      description="Preferences, theme, and account controls."
+      description="Preferences, security, and notifications."
       module="settings"
+      status="Planned"
+      expectedFeatures={[
+    "Theme and locale",
+    "Notification preferences",
+    "Security controls",
+      ]}
     />
   );
 }

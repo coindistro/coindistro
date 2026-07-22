@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
-export const metadata = { title: "Merchants Admin" };
+export const metadata = { title: "Merchants" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
-      title="Merchants Admin"
-      description="Merchant onboarding and settlements."
+    <ComingSoon
+      title="Merchants"
+      description="Merchant onboarding and approvals."
       module="admin-merchants"
+      status="Planned"
+      expectedFeatures={[
+    "KYB review",
+    "Settlement settings",
+    "Risk scoring",
+      ]}
     />
   );
 }

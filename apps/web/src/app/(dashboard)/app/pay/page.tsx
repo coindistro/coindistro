@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Pay" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Pay"
-      description="Payments, checkout links, and merchant pay tools."
+      description="Spend crypto with Coindistro Pay."
       module="pay"
+      status="Planned"
+      expectedFeatures={[
+    "QR payments",
+    "Merchant discovery",
+    "Transaction history",
+      ]}
     />
   );
 }

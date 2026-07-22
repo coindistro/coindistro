@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
-export const metadata = { title: "Admin Settings" };
+export const metadata = { title: "Settings" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
-      title="Admin Settings"
-      description="System settings and configuration."
+    <ComingSoon
+      title="Settings"
+      description="System configuration and policies."
       module="admin-settings"
+      status="Planned"
+      expectedFeatures={[
+    "App settings",
+    "Security policies",
+    "Environment metadata",
+      ]}
     />
   );
 }

@@ -1,13 +1,19 @@
-﻿import { PlaceholderPage } from "@/features/shared/components/placeholder-page";
+import { ComingSoon } from "@/features/shared/components/coming-soon";
 
 export const metadata = { title: "Earn" };
 
 export default function Page() {
   return (
-    <PlaceholderPage
+    <ComingSoon
       title="Earn"
-      description="Flexible, fixed, and product discovery for Coindistro Earn."
+      description="Yield products, launchpools, and learn-to-earn."
       module="earn"
+      status="Planned"
+      expectedFeatures={[
+    "Flexible and locked products",
+    "Launchpool campaigns",
+    "Reward history",
+      ]}
     />
   );
 }

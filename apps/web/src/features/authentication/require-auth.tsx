@@ -22,8 +22,9 @@ export function RequireAuth({
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
-    if (roles?.length && user?.roles) {
-      const ok = roles.some((r) => user.roles?.includes(r));
+    if (roles?.length) {
+      const userRoles = user?.roles ?? [];
+      const ok = roles.some((r) => userRoles.includes(r));
       if (!ok) router.replace("/app/dashboard?error=forbidden");
     }
   }, [loading, isAuthenticated, user, roles, router, pathname]);
@@ -36,9 +37,16 @@ export function RequireAuth({
     );
   }
 
-  if (roles?.length && user?.roles) {
-    const ok = roles.some((r) => user.roles?.includes(r));
-    if (!ok) return null;
+  if (roles?.length) {
+    const userRoles = user?.roles ?? [];
+    const ok = roles.some((r) => userRoles.includes(r));
+    if (!ok) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner label="Redirecting" />
+        </div>
+      );
+    }
   }
 
   return <>{children}</>;

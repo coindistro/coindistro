@@ -724,6 +724,92 @@ func (s *Store) CountUsers(ctx context.Context, status string) (int, error) {
 	return count, err
 }
 
+// CountVerifiedUsers counts users with a verified email.
+func (s *Store) CountVerifiedUsers(ctx context.Context) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM identity_users WHERE deleted_at IS NULL AND email_verified_at IS NOT NULL`,
+	).Scan(&count)
+	return count, err
+}
+
+// CountTotalReferrals counts all referral relationships.
+func (s *Store) CountTotalReferrals(ctx context.Context) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM referrals`,
+	).Scan(&count)
+	return count, err
+}
+
+// CountTotalInvitations counts all invitations.
+func (s *Store) CountTotalInvitations(ctx context.Context) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM invitations`,
+	).Scan(&count)
+	return count, err
+}
+
+// ListRecentLogins returns users ordered by last login (non-null).
+func (s *Store) ListRecentLogins(ctx context.Context, limit int) ([]*models.User, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, username, email, phone, password_hash, display_name, avatar_url,
+			country, timezone, locale, referral_code, referred_by, referral_level,
+			status, email_verified_at, phone_verified_at,
+			is_genesis, genesis_number, genesis_date, is_founder, founder_badge,
+			failed_login_attempts, locked_until, last_login_at, last_login_ip, last_login_user_agent,
+			roles, created_at, updated_at, deleted_at
+		FROM identity_users
+		WHERE deleted_at IS NULL AND last_login_at IS NOT NULL
+		ORDER BY last_login_at DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		u, err := s.scanUserFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+// ListRecentActivity returns recent activity across all users (admin audit preview).
+func (s *Store) ListRecentActivity(ctx context.Context, limit int) ([]*models.ActivityLog, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, user_id, action, ip_address, user_agent, device_id, details, created_at
+		FROM activity_log ORDER BY created_at DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []*models.ActivityLog
+	for rows.Next() {
+		l := &models.ActivityLog{}
+		if err := rows.Scan(
+			&l.ID, &l.UserID, &l.Action, &l.IPAddress, &l.UserAgent,
+			&l.DeviceID, &l.Details, &l.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
 // ─── Internal helpers ─────────────────────────────────
 
 func (s *Store) scanUser(ctx context.Context, query string, args ...interface{}) (*models.User, error) {

@@ -160,6 +160,17 @@ func (p *Pool) Results() <-chan Result {
 	return p.results
 }
 
+// Status returns a lightweight snapshot of the worker pool for admin health views.
+func (p *Pool) Status() map[string]interface{} {
+	return map[string]interface{}{
+		"enabled":     true,
+		"status":      "running",
+		"num_workers": p.numWorkers,
+		"queue_len":   len(p.jobs),
+		"queue_cap":   cap(p.jobs),
+	}
+}
+
 // Stop gracefully shuts down the worker pool.
 func (p *Pool) Stop() {
 	close(p.quit)

@@ -9,6 +9,7 @@ import {
   getAccessToken,
 } from "@/lib/api/client";
 import type { AuthUser } from "@/lib/api/types";
+import { isAdminRole } from "@/lib/api/types";
 import * as authApi from "@/features/authentication/api";
 import { appConfig } from "@/lib/config";
 
@@ -16,8 +17,9 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (input: authApi.RegisterInput) => Promise<void>;
+  isAdmin: boolean;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  register: (input: authApi.RegisterInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
+        // getMe uses the API client which auto-refreshes on 401 once
         const me = await authApi.getMe();
         setUser(me);
         persistUser(me);
@@ -84,15 +87,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       loading,
       isAuthenticated: !!user && !!getAccessToken(),
+      isAdmin: isAdminRole(user?.roles),
       async login(email, password) {
         const data = await authApi.login({ email, password });
         setUser(data.user);
         persistUser(data.user);
+        return data.user;
       },
       async register(input) {
         const data = await authApi.register(input);
         setUser(data.user);
         persistUser(data.user);
+        return data.user;
       },
       async logout() {
         await authApi.logout();

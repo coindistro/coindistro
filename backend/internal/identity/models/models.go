@@ -315,6 +315,34 @@ type ActivityLogResponse struct {
 	CreatedAt time.Time              `json:"created_at"`
 }
 
+// AdminUserSummary is a compact user row for admin lists.
+type AdminUserSummary struct {
+	ID          string     `json:"id"`
+	Email       string     `json:"email"`
+	Username    *string    `json:"username,omitempty"`
+	DisplayName *string    `json:"display_name,omitempty"`
+	Status      string     `json:"status"`
+	IsVerified  bool       `json:"is_verified"`
+	IsGenesis   bool       `json:"is_genesis"`
+	Roles       []string   `json:"roles"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
+// PlatformStats holds aggregate identity metrics for the admin overview.
+type PlatformStats struct {
+	TotalUsers         int                  `json:"total_users"`
+	VerifiedUsers      int                  `json:"verified_users"`
+	GenesisMembers     int                  `json:"genesis_members"`
+	ActiveUsers        int                  `json:"active_users"`
+	TotalReferrals     int                  `json:"total_referrals"`
+	TotalInvitations   int                  `json:"total_invitations"`
+	RecentRegistrations []*AdminUserSummary `json:"recent_registrations"`
+	RecentLogins        []*AdminUserSummary `json:"recent_logins"`
+	RecentActivity      []*ActivityLogResponse `json:"recent_activity"`
+	GenesisConfig       *GenesisConfig      `json:"genesis_config,omitempty"`
+}
+
 // ToResponse converts a User model to a UserResponse.
 func (u *User) ToResponse() *UserResponse {
 	return &UserResponse{
