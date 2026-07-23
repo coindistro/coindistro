@@ -6,9 +6,42 @@ Coindistro is Africa's next-generation crypto financial ecosystem — a unified 
 
 | | |
 |---|---|
-| **Current version** | `v0.2.0` |
-| **Status** | Backend foundation + Identity Service complete |
+| **Current version** | `v0.4.0-alpha` |
+| **Status** | Alpha — Live Authentication & Dashboard |
 | **License** | MIT |
+
+---
+
+## Quick Start
+
+```bash
+# Start infrastructure (PostgreSQL + Redis)
+docker compose up -d
+
+# Bootstrap admin/super_admin users
+cd backend
+go run ./scripts/bootstrap.go
+
+# Seed demo data (users, Earn products, referrals, notifications)
+go run ./scripts/seed.go
+
+# Start the backend API
+make run
+```
+
+```bash
+# In another terminal — start the frontend
+cd apps/web
+npm install
+npm run dev
+```
+
+Open **http://localhost:3000** and sign in with:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Super Admin | `admin@coindistro.com` | `Admin@123456` |
+| Regular User | `user1@coindistro.com` | `User@123456` |
 
 ---
 
@@ -19,12 +52,14 @@ Coindistro is Africa's next-generation crypto financial ecosystem — a unified 
 | Marketing website | ✅ Complete | Next.js landing page (`apps/web`) |
 | Backend infrastructure | ✅ Complete | Go monolith with production-grade foundations |
 | Identity Service | ✅ Complete | Auth, sessions, devices, referrals, invitations, Genesis |
+| User Dashboard | ✅ Complete | Live widgets, profile, referrals, notifications |
+| Admin Dashboard | ✅ Complete | Live stats, system health, workers, scheduler, feature flags |
 | Earn Module | ✅ Complete | Products, participation, rewards engine, portfolio, admin APIs |
-| User Service | 🔜 Next (`v0.3.0`) | Profiles, KYC, preferences |
+| User Service | 🔜 Next | Profiles, KYC, preferences |
 | Wallet / Payments / Exchange | 📋 Planned | Schema prepared; modules not yet implemented |
 | Academy / Signals / Bots | 📋 Planned | Feature-flag placeholders + SQL schema |
 
-**Milestone `v0.2.0`** ships a production-ready backend foundation and a full Identity Service, ready for the next product modules.
+**Milestone `v0.4.0-alpha`** is the first official alpha release, shipping complete authentication, live dashboards, and a production-grade backend architecture.
 
 ---
 
@@ -171,11 +206,15 @@ npm run dev
 ```bash
 cd backend
 cp .env.example .env
-# Start Postgres + Redis (from backend/ or repo root compose)
+# Start Postgres + Redis
 docker compose up -d postgres redis
-# Apply migrations
-psql -h localhost -U coindistro -d coindistro -f migrations/001_initial_schema.sql
-psql -h localhost -U coindistro -d coindistro -f migrations/002_identity_service.sql
+
+# Development bootstrap + demo data (Identity Service; never runs in production)
+go run ./scripts/bootstrap.go
+go run ./scripts/seed.go
+# Super Admin: admin@coindistro.com / Admin@123456
+# User:        user1@coindistro.com / User@123456
+
 # Run API
 make run
 # or with hot reload
