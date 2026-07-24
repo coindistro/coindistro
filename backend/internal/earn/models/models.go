@@ -341,3 +341,8 @@ type ProductListFilter struct {
 	Page     int
 	PerPage  int
 }
+
+type EarnPlatformStats struct {
+	ActiveProducts       int     `json:"active_products"`
+	ActiveParticipants   int     `json:"active_participants"`
+}

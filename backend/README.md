@@ -112,11 +112,41 @@ cp .env.example .env
 docker compose up -d postgres redis
 ```
 
-### 3. Run Database Migrations
+Or start the full stack:
 
 ```bash
-psql -h localhost -U coindistro -d coindistro -f migrations/001_initial_schema.sql
+docker compose up -d
 ```
+
+### 3. Bootstrap & Seed (development only)
+
+After Docker is healthy, initialize the platform and load demo data:
+
+```bash
+# From backend/
+go run ./scripts/bootstrap.go   # Genesis Super Admin only
+go run ./scripts/seed.go        # Full demo dataset
+```
+
+Or via Make:
+
+```bash
+make bootstrap
+make seed
+```
+
+**Safety:** Bootstrap and seed refuse to run unless the environment is `development` / `dev` / `local`
+(`COINDISTRO_ENV`, `APP_ENV`, or `ENV`). They never execute in production.
+
+Default credentials after seed:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Super Admin | `admin@coindistro.com` | `Admin@123456` |
+| Admin | `admin1@coindistro.com` | `Admin@123456` |
+| User | `user1@coindistro.com` | `User@123456` |
+
+Then open the web app at `http://localhost:3000` (with the API at `http://localhost:8080`).
 
 ### 4. Start the Server
 
@@ -129,6 +159,8 @@ make run
 ```
 
 The server will start at `http://localhost:8080`.
+
+> Migrations are applied automatically by `bootstrap` / `seed`. You can still run SQL files manually if preferred.
 
 ## API Endpoints
 

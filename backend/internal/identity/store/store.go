@@ -42,6 +42,57 @@ func (s *Store) CreateUser(ctx context.Context, user *models.User) error {
 	return err
 }
 
+// CreateUserFull inserts a user with verification, genesis, founder, and login metadata.
+// Used by bootstrap/seed paths in the Identity Service (not raw SQL from scripts).
+func (s *Store) CreateUserFull(ctx context.Context, user *models.User) error {
+	now := time.Now().UTC()
+	query := `
+		INSERT INTO identity_users (
+			id, username, email, password_hash, display_name, avatar_url,
+			country, timezone, locale, referral_code, referred_by, referral_level,
+			status, email_verified_at,
+			is_genesis, genesis_number, genesis_date, is_founder, founder_badge,
+			last_login_at, last_login_ip, last_login_user_agent,
+			roles, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10, $11, $12,
+			$13, $14,
+			$15, $16, $17, $18, $19,
+			$20, $21, $22,
+			$23, $24, $25
+		)`
+
+	_, err := s.pool.Exec(ctx, query,
+		user.ID, user.Username, user.Email, user.PasswordHash, user.DisplayName, user.AvatarURL,
+		user.Country, user.Timezone, user.Locale, user.ReferralCode, user.ReferredBy, user.ReferralLevel,
+		user.Status, user.EmailVerifiedAt,
+		user.IsGenesis, user.GenesisNumber, user.GenesisDate, user.IsFounder, user.FounderBadge,
+		user.LastLoginAt, user.LastLoginIP, user.LastLoginUserAgent,
+		user.Roles, now, now,
+	)
+	return err
+}
+
+// CountUsersWithRole counts users that have the given role in their roles array.
+func (s *Store) CountUsersWithRole(ctx context.Context, role string) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM identity_users WHERE deleted_at IS NULL AND $1 = ANY(roles)`,
+		role,
+	).Scan(&count)
+	return count, err
+}
+
+// CountActiveSessions returns the number of active sessions platform-wide.
+func (s *Store) CountActiveSessions(ctx context.Context) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM sessions WHERE status = 'active' AND expires_at > NOW()`,
+	).Scan(&count)
+	return count, err
+}
+
 // GetUserByEmail retrieves a user by email.
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `SELECT id, username, email, phone, password_hash, display_name, avatar_url,
@@ -576,10 +627,14 @@ func (s *Store) RemoveDevice(ctx context.Context, deviceID, userID string) error
 
 // LogActivity creates an activity log entry.
 func (s *Store) LogActivity(ctx context.Context, log *models.ActivityLog) error {
+	createdAt := log.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO activity_log (id, user_id, action, ip_address, user_agent, device_id, details)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		log.ID, log.UserID, log.Action, log.IPAddress, log.UserAgent, log.DeviceID, log.Details)
+		`INSERT INTO activity_log (id, user_id, action, ip_address, user_agent, device_id, details, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		log.ID, log.UserID, log.Action, log.IPAddress, log.UserAgent, log.DeviceID, log.Details, createdAt)
 	return err
 }
 

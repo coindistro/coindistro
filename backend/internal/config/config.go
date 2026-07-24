@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -66,6 +68,11 @@ func (d DatabaseConfig) DSN() string {
 	)
 }
 
+// IsConfigured returns true if the database has been configured with a host.
+func (d DatabaseConfig) IsConfigured() bool {
+	return d.Host != ""
+}
+
 // RedisConfig holds Redis connection configuration.
 type RedisConfig struct {
 	Host         string `mapstructure:"host"`
@@ -86,6 +93,12 @@ type AuthConfig struct {
 	AccessTokenTTL     time.Duration `mapstructure:"access_token_ttl"`
 	RefreshTokenTTL    time.Duration `mapstructure:"refresh_token_ttl"`
 	Issuer             string        `mapstructure:"issuer"`
+}
+
+// HasValidSecrets returns true if both JWT secrets are set to non-default values.
+func (a AuthConfig) HasValidSecrets() bool {
+	return a.AccessTokenSecret != "" && a.AccessTokenSecret != "change-me-in-production" &&
+		a.RefreshTokenSecret != "" && a.RefreshTokenSecret != "change-me-in-production-too"
 }
 
 // RateLimiterConfig holds rate limiting configuration.
@@ -179,6 +192,16 @@ func (r RedisConfig) RedisAddr() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
+// IsConfigured returns true if Redis has been configured with a host.
+func (r RedisConfig) IsConfigured() bool {
+	return r.Host != ""
+}
+
+// IsProduction returns true if the environment is production.
+func (c AppConfig) IsProduction() bool {
+	return strings.EqualFold(c.Environment, "production")
+}
+
 // Load reads configuration from file and environment variables.
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
@@ -214,6 +237,35 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Support Render's PORT environment variable
+	if port := os.Getenv("PORT"); port != "" {
+		var portInt int
+		if _, err := fmt.Sscanf(port, "%d", &portInt); err == nil && portInt > 0 {
+			cfg.Server.Port = portInt
+		}
+	}
+
+	// Production overrides
+	if cfg.App.IsProduction() {
+		// Production must not use localhost defaults for database
+		if !cfg.Database.IsConfigured() {
+			return nil, fmt.Errorf("database host is required in production (set COINDISTRO_DB_HOST)")
+		}
+		// Production must not use localhost defaults for Redis
+		if !cfg.Redis.IsConfigured() {
+			return nil, fmt.Errorf("redis host is required in production (set COINDISTRO_REDIS_HOST)")
+		}
+		// Production must have valid JWT secrets
+		if !cfg.Auth.HasValidSecrets() {
+			return nil, fmt.Errorf("valid JWT secrets are required in production (set COINDISTRO_JWT_ACCESS_SECRET and COINDISTRO_JWT_REFRESH_SECRET)")
+		}
+		// Production log level should be info unless explicitly overridden
+		if v.GetString("logging.level") == "" || v.GetString("logging.level") == "debug" {
+			// Leave as-is if user explicitly set it, otherwise default to info
+			// But the default is already "info", so this is fine
+		}
+	}
+
 	// Convert minutes to duration for auth TTLs
 	cfg.Auth.AccessTokenTTL = cfg.Auth.AccessTokenTTL * time.Minute
 	cfg.Auth.RefreshTokenTTL = cfg.Auth.RefreshTokenTTL * time.Minute
@@ -228,7 +280,7 @@ func Load(configPath string) (*Config, error) {
 
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.name", "coindistro")
-	v.SetDefault("app.version", "1.0.0")
+	v.SetDefault("app.version", "v0.4.0-alpha")
 	v.SetDefault("app.environment", "development")
 	v.SetDefault("app.debug", true)
 
@@ -357,4 +409,7 @@ func bindEnvKeys(v *viper.Viper) {
 			_ = err
 		}
 	}
+
+	// CORS allowed origins from comma-separated env var
+	_ = v.BindEnv("cors.allowed_origins", "COINDISTRO_ALLOWED_ORIGINS")
 }

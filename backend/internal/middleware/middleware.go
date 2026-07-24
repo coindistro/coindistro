@@ -247,8 +247,16 @@ func RequestID() gin.HandlerFunc {
 
 // CORS returns a configured CORS middleware.
 func CORS(cfg config.CORSConfig) gin.HandlerFunc {
+	origins := cfg.AllowedOrigins
+	// If only one origin contains commas, split it (supports COINDISTRO_ALLOWED_ORIGINS env var)
+	if len(origins) == 1 && strings.Contains(origins[0], ",") {
+		origins = strings.Split(origins[0], ",")
+		for i := range origins {
+			origins[i] = strings.TrimSpace(origins[i])
+		}
+	}
 	return cors.New(cors.Config{
-		AllowOrigins:     cfg.AllowedOrigins,
+		AllowOrigins:     origins,
 		AllowMethods:     cfg.AllowedMethods,
 		AllowHeaders:     cfg.AllowedHeaders,
 		AllowCredentials: cfg.AllowCredentials,

@@ -1,5 +1,16 @@
 # ─── Coindistro Backend Docker Compose ─────────────────
-# Usage: docker compose up -d --build
+# Usage:
+#   docker compose up -d --build
+#
+# Development bootstrap (from host, after Postgres is healthy):
+#   cd backend
+#   go run ./scripts/bootstrap.go
+#   go run ./scripts/seed.go
+#
+# Then open http://localhost:3000
+# Login: admin@coindistro.com / Admin@123456
+#
+# Bootstrap & seed are DEVELOPMENT ONLY and refuse production env.
 
 services:
   # ── API (Go Backend) ──────────────────────────────

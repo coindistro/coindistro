@@ -1,6 +1,6 @@
 # ─── Coindistro Backend Makefile ───────────────────────
 
-.PHONY: help build run test lint clean dev docker-up docker-down swagger
+.PHONY: help build run test lint clean dev docker-up docker-down swagger bootstrap seed
 
 APP_NAME = coindistro-api
 BUILD_DIR = ./bin
@@ -64,6 +64,21 @@ docker-down: ## Stop Docker services
 
 docker-logs: ## View Docker logs
 	@docker compose logs -f
+
+bootstrap: ## Create Genesis Super Admin (development only)
+	@echo "Running bootstrap (development only)..."
+	@go run ./scripts/bootstrap.go
+
+seed: ## Seed demo users, earn products, activity (development only)
+	@echo "Running seeder (development only)..."
+	@go run ./scripts/seed.go
+
+dev-setup: docker-up ## Start Docker then bootstrap + seed
+	@echo "Waiting for Postgres..."
+	@sleep 5
+	@$(MAKE) bootstrap
+	@$(MAKE) seed
+	@echo "Open http://localhost:3000 and login with admin@coindistro.com / Admin@123456"
 
 swagger: ## Generate Swagger documentation
 	@echo "Generating Swagger documentation..."

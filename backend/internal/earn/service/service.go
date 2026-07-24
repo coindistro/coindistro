@@ -799,6 +799,27 @@ func (s *Service) RefreshMetrics(ctx context.Context) {
 	}
 }
 
+// GetEarnPlatformStats returns aggregate earn metrics for admin dashboard.
+func (s *Service) GetEarnPlatformStats(ctx context.Context) (*models.EarnPlatformStats, error) {
+	stats := &models.EarnPlatformStats{}
+
+	activeProducts, err := s.store.CountActiveProducts(ctx)
+	if err != nil {
+		s.logger.Error("earn platform stats: active products", zap.Error(err))
+	} else {
+		stats.ActiveProducts = activeProducts
+	}
+
+	activeParticipants, err := s.store.CountActiveParticipants(ctx)
+	if err != nil {
+		s.logger.Error("earn platform stats: active participants", zap.Error(err))
+	} else {
+		stats.ActiveParticipants = activeParticipants
+	}
+
+	return stats, nil
+}
+
 // ─── helpers ──────────────────────────────────────────
 
 func (s *Service) registerWorkers() {

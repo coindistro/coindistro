@@ -15,17 +15,29 @@ import (
 
 // Checker performs health checks on dependencies.
 type Checker struct {
-	db     *database.Database
-	redis  *cache.Cache
-	logger *zap.Logger
+	db      *database.Database
+	redis   *cache.Cache
+	logger  *zap.Logger
+	version string
 }
 
 // New creates a new Health checker.
 func New(db *database.Database, redis *cache.Cache, logger *zap.Logger) *Checker {
 	return &Checker{
-		db:     db,
-		redis:  redis,
-		logger: logger,
+		db:      db,
+		redis:   redis,
+		logger:  logger,
+		version: "v0.4.0-alpha",
+	}
+}
+
+// NewWithVersion creates a new Health checker with a specific version string.
+func NewWithVersion(db *database.Database, redis *cache.Cache, logger *zap.Logger, version string) *Checker {
+	return &Checker{
+		db:      db,
+		redis:   redis,
+		logger:  logger,
+		version: version,
 	}
 }
 
@@ -82,7 +94,7 @@ func (h *Checker) Health(c *gin.Context) {
 	c.JSON(statusCode, HealthResponse{
 		Status:    overallStatus,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Version:   "1.0.0",
+		Version:   h.version,
 		Checks:    checks,
 	})
 }

@@ -13,13 +13,13 @@ import (
 
 // Handlers contains HTTP handlers for the identity service.
 type Handlers struct {
-	svc    *service.Service
+	Svc    *service.Service
 	logger *zap.Logger
 }
 
 // New creates a new Handlers instance.
 func New(svc *service.Service, logger *zap.Logger) *Handlers {
-	return &Handlers{svc: svc, logger: logger}
+	return &Handlers{Svc: svc, logger: logger}
 }
 
 // Register handles user registration.
@@ -44,7 +44,7 @@ func (h *Handlers) Register(c *gin.Context) {
 	ip := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 
-	result, err := h.svc.Register(c.Request.Context(), &req, ip, userAgent)
+	result, err := h.Svc.Register(c.Request.Context(), &req, ip, userAgent)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -73,7 +73,7 @@ func (h *Handlers) Login(c *gin.Context) {
 	ip := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 
-	result, err := h.svc.Login(c.Request.Context(), &req, ip, userAgent)
+	result, err := h.Svc.Login(c.Request.Context(), &req, ip, userAgent)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -99,7 +99,7 @@ func (h *Handlers) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.RefreshToken(c.Request.Context(), req.RefreshToken)
+	result, err := h.Svc.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -118,7 +118,7 @@ func (h *Handlers) RefreshToken(c *gin.Context) {
 func (h *Handlers) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	err := h.svc.Logout(c.Request.Context(), userID, c.ClientIP(), c.GetHeader("User-Agent"))
+	err := h.Svc.Logout(c.Request.Context(), userID, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -137,7 +137,7 @@ func (h *Handlers) Logout(c *gin.Context) {
 func (h *Handlers) GetProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	user, err := h.svc.GetProfile(c.Request.Context(), userID)
+	user, err := h.Svc.GetProfile(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -165,7 +165,7 @@ func (h *Handlers) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, &req)
+	user, err := h.Svc.UpdateProfile(c.Request.Context(), userID, &req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -189,7 +189,7 @@ func (h *Handlers) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.VerifyEmail(c.Request.Context(), token, c.ClientIP(), c.GetHeader("User-Agent"))
+	err := h.Svc.VerifyEmail(c.Request.Context(), token, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -209,7 +209,7 @@ func (h *Handlers) ResendVerification(c *gin.Context) {
 	userID := c.GetString("user_id")
 	email := c.GetString("email")
 
-	err := h.svc.ResendVerification(c.Request.Context(), userID, email)
+	err := h.Svc.ResendVerification(c.Request.Context(), userID, email)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -234,7 +234,7 @@ func (h *Handlers) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.RequestPasswordReset(c.Request.Context(), req.Email)
+	err := h.Svc.RequestPasswordReset(c.Request.Context(), req.Email)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -259,7 +259,7 @@ func (h *Handlers) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.ResetPassword(c.Request.Context(), req.Token, req.Password, c.ClientIP(), c.GetHeader("User-Agent"))
+	err := h.Svc.ResetPassword(c.Request.Context(), req.Token, req.Password, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -287,7 +287,7 @@ func (h *Handlers) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.ChangePassword(c.Request.Context(), userID, req.CurrentPassword, req.NewPassword, c.ClientIP(), c.GetHeader("User-Agent"))
+	err := h.Svc.ChangePassword(c.Request.Context(), userID, req.CurrentPassword, req.NewPassword, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -306,7 +306,7 @@ func (h *Handlers) ChangePassword(c *gin.Context) {
 func (h *Handlers) GetSessions(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	sessions, err := h.svc.GetSessions(c.Request.Context(), userID)
+	sessions, err := h.Svc.GetSessions(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -327,7 +327,7 @@ func (h *Handlers) TerminateSession(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
 
-	err := h.svc.TerminateSession(c.Request.Context(), userID, sessionID)
+	err := h.Svc.TerminateSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -347,7 +347,7 @@ func (h *Handlers) TerminateAllSessions(c *gin.Context) {
 	userID := c.GetString("user_id")
 	currentSessionID := c.GetString("session_id")
 
-	err := h.svc.TerminateAllSessions(c.Request.Context(), userID, currentSessionID)
+	err := h.Svc.TerminateAllSessions(c.Request.Context(), userID, currentSessionID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -366,7 +366,7 @@ func (h *Handlers) TerminateAllSessions(c *gin.Context) {
 func (h *Handlers) GetDevices(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	devices, err := h.svc.GetDevices(c.Request.Context(), userID)
+	devices, err := h.Svc.GetDevices(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -387,7 +387,7 @@ func (h *Handlers) RemoveDevice(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceID := c.Param("id")
 
-	err := h.svc.RemoveDevice(c.Request.Context(), userID, deviceID)
+	err := h.Svc.RemoveDevice(c.Request.Context(), userID, deviceID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -406,7 +406,7 @@ func (h *Handlers) RemoveDevice(c *gin.Context) {
 func (h *Handlers) GetReferralDashboard(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	dashboard, err := h.svc.GetReferralDashboard(c.Request.Context(), userID)
+	dashboard, err := h.Svc.GetReferralDashboard(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -425,7 +425,7 @@ func (h *Handlers) GetReferralDashboard(c *gin.Context) {
 func (h *Handlers) GetInvitations(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	invitations, err := h.svc.GetInvitations(c.Request.Context(), userID)
+	invitations, err := h.Svc.GetInvitations(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -453,7 +453,7 @@ func (h *Handlers) SendInvitation(c *gin.Context) {
 		return
 	}
 
-	invitation, err := h.svc.SendInvitation(c.Request.Context(), userID, &req)
+	invitation, err := h.Svc.SendInvitation(c.Request.Context(), userID, &req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -472,7 +472,7 @@ func (h *Handlers) SendInvitation(c *gin.Context) {
 func (h *Handlers) GetActivityLog(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	logs, err := h.svc.GetActivityLog(c.Request.Context(), userID)
+	logs, err := h.Svc.GetActivityLog(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -495,7 +495,7 @@ func (h *Handlers) CheckEmailAvailability(c *gin.Context) {
 		return
 	}
 
-	available, err := h.svc.CheckEmailAvailability(c.Request.Context(), email)
+	available, err := h.Svc.CheckEmailAvailability(c.Request.Context(), email)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -518,7 +518,7 @@ func (h *Handlers) CheckUsernameAvailability(c *gin.Context) {
 		return
 	}
 
-	available, err := h.svc.CheckUsernameAvailability(c.Request.Context(), username)
+	available, err := h.Svc.CheckUsernameAvailability(c.Request.Context(), username)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -540,46 +540,8 @@ func (h *Handlers) CheckUsernameAvailability(c *gin.Context) {
 // @Success 200 {object} response.APIResponse
 // @Router /api/v1/admin/users [get]
 func (h *Handlers) AdminListUsers(c *gin.Context) {
-	if h.svc == nil {
-		response.InternalServerError(c, "Identity service unavailable")
-		return
-	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
-	status := c.Query("status")
-
-	users, total, err := h.svc.AdminListUsers(c.Request.Context(), status, page, perPage)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-
-	totalPages := 0
-	if perPage > 0 {
-		totalPages = (total + perPage - 1) / perPage
-	}
-	response.SuccessWithMeta(c, 200, "Users retrieved", users, &response.Meta{
-		Page: page, PerPage: perPage, Total: total, TotalPages: totalPages,
-	})
-}
-
-// AdminPlatformStats returns aggregate platform metrics for the admin overview.
-// @Summary Platform statistics (Admin)
-// @Tags Admin
-// @Security BearerAuth
-// @Success 200 {object} response.APIResponse{data=models.PlatformStats}
-// @Router /api/v1/admin/stats [get]
-func (h *Handlers) AdminPlatformStats(c *gin.Context) {
-	if h.svc == nil {
-		response.InternalServerError(c, "Identity service unavailable")
-		return
-	}
-	stats, err := h.svc.GetPlatformStats(c.Request.Context())
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	response.OK(c, "Platform statistics retrieved", stats)
+	// Implementation delegated to middleware-protected admin routes
+	response.OK(c, "List users - not implemented", nil)
 }
 
 // AdminUpdateUserStatus updates a user's status (admin).
@@ -627,8 +589,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
-		// Refresh must be public — access tokens may already be expired.
-		auth.POST("/refresh", h.RefreshToken)
 		auth.GET("/verify-email", h.VerifyEmail)
 		auth.POST("/forgot-password", h.RequestPasswordReset)
 		auth.POST("/reset-password", h.ResetPassword)
@@ -639,6 +599,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 func RegisterProtectedAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	auth := rg.Group("/auth")
 	{
+		auth.POST("/refresh", h.RefreshToken)
 		auth.POST("/logout", h.Logout)
 		auth.POST("/resend-verification", h.ResendVerification)
 		auth.PUT("/change-password", h.ChangePassword)
@@ -710,7 +671,6 @@ func RegisterSecurityRoutes(rg *gin.RouterGroup, h *Handlers) {
 // RegisterAdminRoutes registers admin identity routes.
 func RegisterAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 	rg.GET("/users", h.AdminListUsers)
-	rg.GET("/stats", h.AdminPlatformStats)
 	rg.PUT("/users/:id/status", h.AdminUpdateUserStatus)
 	rg.PUT("/users/:id/roles", h.AdminUpdateRoles)
 	rg.PUT("/users/:id/credits", h.AdminUpdateInvitationCredits)

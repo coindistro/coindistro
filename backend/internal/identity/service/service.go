@@ -699,6 +699,26 @@ func (s *Service) GetActivityLog(ctx context.Context, userID string) ([]*models.
 	return resp, nil
 }
 
+// GetPlatformActivityLog returns recent activity across all users (admin).
+func (s *Service) GetPlatformActivityLog(ctx context.Context, limit int) ([]*models.ActivityLogResponse, error) {
+	logs, err := s.store.ListRecentActivity(ctx, limit)
+	if err != nil {
+		return nil, apperrors.ErrInternalServer
+	}
+	var resp []*models.ActivityLogResponse
+	for _, l := range logs {
+		resp = append(resp, &models.ActivityLogResponse{
+			ID:        l.ID,
+			Action:    l.Action,
+			IPAddress: l.IPAddress,
+			DeviceID:  l.DeviceID,
+			Details:   l.Details,
+			CreatedAt: l.CreatedAt,
+		})
+	}
+	return resp, nil
+}
+
 // CheckEmailAvailability checks if an email is available.
 func (s *Service) CheckEmailAvailability(ctx context.Context, emailAddr string) (bool, error) {
 	taken, err := s.store.IsEmailTaken(ctx, emailAddr)
