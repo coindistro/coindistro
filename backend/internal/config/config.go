@@ -1,8 +1,11 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,7 +82,9 @@ type RedisConfig struct {
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
 	Password     string `mapstructure:"password"`
+	URL          string `mapstructure:"url"`
 	DB           int    `mapstructure:"db"`
+	TLSEnabled   bool   `mapstructure:"tls_enabled"`
 	DialTimeout  int    `mapstructure:"dial_timeout"`
 	ReadTimeout  int    `mapstructure:"read_timeout"`
 	WriteTimeout int    `mapstructure:"write_timeout"`
@@ -193,9 +198,72 @@ func (r RedisConfig) RedisAddr() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
-// IsConfigured returns true if Redis has been configured with a host.
+// IsConfigured returns true if Redis has been configured with a host or URL.
 func (r RedisConfig) IsConfigured() bool {
-	return r.Host != ""
+	return r.Host != "" || r.URL != ""
+}
+
+func (r *RedisConfig) ApplyURL(rawURL string) error {
+	if strings.TrimSpace(rawURL) == "" {
+		return nil
+	}
+
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid redis URL: %w", err)
+	}
+
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "redis" && scheme != "rediss" {
+		return fmt.Errorf("invalid redis URL scheme %q", parsedURL.Scheme)
+	}
+	if parsedURL.Host == "" {
+		return fmt.Errorf("redis URL must include a host")
+	}
+
+	host := parsedURL.Hostname()
+	port := 6379
+	if parsedURL.Port() != "" {
+		parsedPort, err := strconv.Atoi(parsedURL.Port())
+		if err != nil || parsedPort < 1 || parsedPort > 65535 {
+			return fmt.Errorf("invalid redis port %q", parsedURL.Port())
+		}
+		port = parsedPort
+	}
+
+	password := ""
+	if parsedURL.User != nil {
+		if pass, ok := parsedURL.User.Password(); ok {
+			password = pass
+		}
+	}
+
+	db := 0
+	if parsedURL.Path != "" && parsedURL.Path != "/" {
+		path := strings.TrimPrefix(parsedURL.Path, "/")
+		if path != "" {
+			parsedDB, err := strconv.Atoi(path)
+			if err != nil || parsedDB < 0 || parsedDB > 15 {
+				return fmt.Errorf("invalid redis DB index %q", path)
+			}
+			db = parsedDB
+		}
+	}
+
+	r.URL = rawURL
+	r.Host = host
+	r.Port = port
+	r.Password = password
+	r.DB = db
+	r.TLSEnabled = scheme == "rediss"
+	return nil
+}
+
+func (r RedisConfig) TLSConfig() *tls.Config {
+	if !r.TLSEnabled {
+		return nil
+	}
+	return &tls.Config{MinVersion: tls.VersionTLS12, ServerName: r.Host}
 }
 
 // IsProduction returns true if the environment is production.
@@ -268,6 +336,12 @@ func Load(configPath string) (*Config, error) {
 		}
 	}
 
+	if redisURL := strings.TrimSpace(v.GetString("redis.url")); redisURL != "" {
+		if err := cfg.Redis.ApplyURL(redisURL); err != nil {
+			return nil, fmt.Errorf("redis URL: %w", err)
+		}
+	}
+
 	// Production overrides
 	if cfg.App.IsProduction() {
 		// Production must not use localhost defaults for database
@@ -276,7 +350,10 @@ func Load(configPath string) (*Config, error) {
 		}
 		// Production must not use localhost defaults for Redis
 		if !cfg.Redis.IsConfigured() {
-			return nil, fmt.Errorf("redis host is required in production (set COINDISTRO_REDIS_HOST)")
+			return nil, fmt.Errorf("redis host is required in production (set COINDISTRO_REDIS_HOST or COINDISTRO_REDIS_URL)")
+		}
+		if cfg.Redis.Password == "" {
+			return nil, fmt.Errorf("redis password is required in production (set COINDISTRO_REDIS_PASSWORD or include it in COINDISTRO_REDIS_URL)")
 		}
 		// Production must have valid JWT secrets
 		if !cfg.Auth.HasValidSecrets() {
@@ -328,7 +405,7 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("redis.host", "localhost")
 	v.SetDefault("redis.port", 6379)
-	v.SetDefault("redis.password", "coindistro")
+	v.SetDefault("redis.password", "")
 	v.SetDefault("redis.db", 0)
 	v.SetDefault("redis.dial_timeout", 5)
 	v.SetDefault("redis.read_timeout", 3)
@@ -410,6 +487,7 @@ func bindEnvKeys(v *viper.Viper) {
 		"redis.host":                    "COINDISTRO_REDIS_HOST",
 		"redis.port":                    "COINDISTRO_REDIS_PORT",
 		"redis.password":                "COINDISTRO_REDIS_PASSWORD",
+		"redis.url":                     "COINDISTRO_REDIS_URL",
 		"auth.access_token_secret":      "COINDISTRO_JWT_ACCESS_SECRET",
 		"auth.refresh_token_secret":     "COINDISTRO_JWT_REFRESH_SECRET",
 		"auth.access_token_ttl":         "COINDISTRO_JWT_ACCESS_TTL",

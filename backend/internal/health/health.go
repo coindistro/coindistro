@@ -74,9 +74,10 @@ func (h *Checker) Health(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
 		if err := h.redis.Ping(ctx); err != nil {
-			checks["redis"] = "unhealthy: " + err.Error()
+			status := h.redis.HealthStatus()
+			checks["redis"] = status
 			overallStatus = "degraded"
-			h.logger.Error("health check: redis unhealthy", zap.Error(err))
+			h.logger.Error("health check: redis unhealthy", zap.String("status", status), zap.Error(err))
 		} else {
 			checks["redis"] = "healthy"
 		}
@@ -123,10 +124,10 @@ func (h *Checker) Ready(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
 		if err := h.redis.Ping(ctx); err != nil {
-			checks["redis"] = "not_ready: " + err.Error()
+			checks["redis"] = h.redis.HealthStatus()
 			allReady = false
 		} else {
-			checks["redis"] = "ready"
+			checks["redis"] = "healthy"
 		}
 	} else {
 		checks["redis"] = "not_configured"

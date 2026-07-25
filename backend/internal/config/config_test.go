@@ -7,6 +7,132 @@ import (
 	"time"
 )
 
+func TestLoad_RedisHostPortFromEnv(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_REDIS_HOST", "redis.internal")
+	t.Setenv("COINDISTRO_REDIS_PORT", "6380")
+	t.Setenv("COINDISTRO_REDIS_PASSWORD", "secret")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Redis.Host != "redis.internal" {
+		t.Fatalf("redis host = %q, want %q", cfg.Redis.Host, "redis.internal")
+	}
+	if cfg.Redis.Port != 6380 {
+		t.Fatalf("redis port = %d, want 6380", cfg.Redis.Port)
+	}
+	if cfg.Redis.Password != "secret" {
+		t.Fatalf("redis password = %q, want %q", cfg.Redis.Password, "secret")
+	}
+}
+
+func TestLoad_RedisURLConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_REDIS_URL", "redis://:secret@redis.example.com:6380/2")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Redis.Host != "redis.example.com" {
+		t.Fatalf("redis host = %q, want %q", cfg.Redis.Host, "redis.example.com")
+	}
+	if cfg.Redis.Port != 6380 {
+		t.Fatalf("redis port = %d, want 6380", cfg.Redis.Port)
+	}
+	if cfg.Redis.Password != "secret" {
+		t.Fatalf("redis password = %q, want %q", cfg.Redis.Password, "secret")
+	}
+	if cfg.Redis.DB != 2 {
+		t.Fatalf("redis db = %d, want 2", cfg.Redis.DB)
+	}
+}
+
+func TestLoad_RedisTLSURLConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_REDIS_URL", "rediss://:secret@upstash.example.com:6380/1")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if !cfg.Redis.TLSEnabled {
+		t.Fatal("expected TLS to be enabled for rediss:// URLs")
+	}
+}
+
+func TestLoad_ProductionRequiresRedisPassword(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: production
+auth:
+  access_token_secret: test-access
+  refresh_token_secret: test-refresh
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_DB_HOST", "db.internal")
+	t.Setenv("COINDISTRO_REDIS_HOST", "redis.internal")
+	t.Setenv("COINDISTRO_REDIS_PASSWORD", "")
+
+	_, err := Load(cfgPath)
+	if err == nil {
+		t.Fatal("expected production load to fail when Redis password is missing")
+	}
+}
+
+func TestLoad_InvalidRedisURL(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_REDIS_URL", "http://not-redis.example.com")
+
+	_, err := Load(cfgPath)
+	if err == nil {
+		t.Fatal("expected invalid redis URL to fail")
+	}
+}
+
 func TestLoad_DefaultJWTMinutes(t *testing.T) {
 	// Isolate from ambient env that may override TTLs.
 	t.Setenv("COINDISTRO_JWT_ACCESS_TTL", "")

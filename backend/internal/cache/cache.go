@@ -2,7 +2,10 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,17 +16,24 @@ import (
 
 // Cache wraps the Redis client.
 type Cache struct {
-	Client *redis.Client
-	config config.RedisConfig
-	logger *zap.Logger
+	Client  *redis.Client
+	config  config.RedisConfig
+	logger  *zap.Logger
+	status  string
+	lastErr error
 }
 
 // New creates a new Redis cache connection.
 func New(cfg config.RedisConfig, logger *zap.Logger) (*Cache, error) {
+	if !cfg.IsConfigured() {
+		return nil, fmt.Errorf("redis is not configured")
+	}
+
 	client := redis.NewClient(&redis.Options{
 		Addr:         cfg.RedisAddr(),
 		Password:     cfg.Password,
 		DB:           cfg.DB,
+		TLSConfig:    cfg.TLSConfig(),
 		DialTimeout:  time.Duration(cfg.DialTimeout) * time.Second,
 		ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
@@ -31,29 +41,90 @@ func New(cfg config.RedisConfig, logger *zap.Logger) (*Cache, error) {
 		MinIdleConns: cfg.MinIdleConns,
 	})
 
+	cache := &Cache{
+		Client: client,
+		config: cfg,
+		logger: logger,
+		status: "not_configured",
+	}
+
+	logger.Info("Redis enabled",
+		zap.String("redis_host", cfg.Host),
+		zap.Int("redis_port", cfg.Port),
+		zap.Bool("tls_enabled", cfg.TLSEnabled),
+	)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+		cache.setError(err)
+		logger.Warn("redis connection failed",
+			zap.String("host", cfg.Host),
+			zap.Int("port", cfg.Port),
+			zap.Bool("tls_enabled", cfg.TLSEnabled),
+			zap.Error(err),
+		)
+		return cache, nil
 	}
 
+	cache.status = "healthy"
 	logger.Info("redis connection established",
 		zap.String("host", cfg.Host),
 		zap.Int("port", cfg.Port),
 		zap.Int("db", cfg.DB),
 	)
 
-	return &Cache{
-		Client: client,
-		config: cfg,
-		logger: logger,
-	}, nil
+	return cache, nil
+}
+
+func (c *Cache) setError(err error) {
+	c.lastErr = err
+	c.status = classifyRedisError(err)
+}
+
+func classifyRedisError(err error) string {
+	if err == nil {
+		return "healthy"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "auth") || strings.Contains(msg, "password") || strings.Contains(msg, "noauth") || strings.Contains(msg, "wrongpass"):
+		return "authentication_failed"
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
+		return "timeout"
+	default:
+		return "unreachable"
+	}
+}
+
+func (c *Cache) HealthStatus() string {
+	if c == nil {
+		return "not_configured"
+	}
+	if c.status == "" {
+		return "not_configured"
+	}
+	return c.status
 }
 
 // Ping checks if Redis is reachable.
 func (c *Cache) Ping(ctx context.Context) error {
-	return c.Client.Ping(ctx).Err()
+	err := c.Client.Ping(ctx).Err()
+	if err != nil {
+		c.setError(err)
+		return err
+	}
+	c.status = "healthy"
+	c.lastErr = nil
+	return nil
 }
 
 // Close closes the Redis connection.
