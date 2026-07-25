@@ -40,8 +40,9 @@ redis:
 auth:
   access_token_secret: "change-me-in-production"
   refresh_token_secret: "change-me-in-production-too"
-  access_token_ttl: 15 # minutes
-  refresh_token_ttl: 10080 # minutes (7 days)
+  # Pure numbers = minutes. Also accepts Go durations: 15m, 1h, 168h (not 7d).
+  access_token_ttl: 15 # minutes (or "15m")
+  refresh_token_ttl: 10080 # minutes = 7 days (or "168h")
   issuer: "coindistro"
 
 rate_limiter:

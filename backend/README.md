@@ -532,14 +532,33 @@ prefixed with `COINDISTRO_`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `COINDISTRO_ENV` | `development` | Environment |
-| `COINDISTRO_PORT` | `8080` | Server port |
+| `COINDISTRO_PORT` | `8080` | Server port (Render also honors `PORT`) |
 | `COINDISTRO_DB_HOST` | `localhost` | PostgreSQL host |
 | `COINDISTRO_REDIS_HOST` | `localhost` | Redis host |
-| `COINDISTRO_JWT_ACCESS_SECRET` | - | JWT secret |
+| `COINDISTRO_JWT_ACCESS_SECRET` | - | JWT access token secret |
+| `COINDISTRO_JWT_REFRESH_SECRET` | - | JWT refresh token secret |
+| `COINDISTRO_JWT_ACCESS_TTL` | `15` / `15m` | Access TTL: pure minutes (`15`) or Go duration (`15m`) |
+| `COINDISTRO_JWT_REFRESH_TTL` | `10080` / `168h` | Refresh TTL: pure minutes or Go duration (`168h` = 7 days; no `d` unit) |
 | `COINDISTRO_LOG_LEVEL` | `info` | Log level |
 | `COINDISTRO_TELEMETRY_ENABLED` | `false` | Enable tracing |
 | `COINDISTRO_SMTP_HOST` | - | SMTP host |
 | `COINDISTRO_METRICS_ENABLED` | `true` | Enable Prometheus |
+
+#### JWT TTL formats (Render & local)
+
+Both forms are accepted for `COINDISTRO_JWT_*_TTL`:
+
+```env
+# Pure numbers = minutes (backward compatible with existing .env files)
+COINDISTRO_JWT_ACCESS_TTL=15
+COINDISTRO_JWT_REFRESH_TTL=10080
+
+# Go duration strings (recommended for Render)
+COINDISTRO_JWT_ACCESS_TTL=15m
+COINDISTRO_JWT_REFRESH_TTL=168h
+```
+
+Invalid values fail startup with a clear error. Go does not support `7d` — use `168h`.
 
 ## Makefile Commands
 

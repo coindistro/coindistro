@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 
@@ -233,9 +234,31 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		flexibleDurationDecodeHook(),
+		mapstructure.StringToTimeDurationHookFunc(),
+	))); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	// Explicitly parse JWT TTLs from raw config values so env strings like
+	// "15", "15m", and "168h" all work (Render-friendly + local .env compatible).
+	accessTTL, err := ParseFlexibleDuration(v.Get("auth.access_token_ttl"), time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("auth.access_token_ttl: %w", err)
+	}
+	refreshTTL, err := ParseFlexibleDuration(v.Get("auth.refresh_token_ttl"), time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("auth.refresh_token_ttl: %w", err)
+	}
+	if accessTTL <= 0 {
+		accessTTL = 15 * time.Minute
+	}
+	if refreshTTL <= 0 {
+		refreshTTL = 10080 * time.Minute // 7 days
+	}
+	cfg.Auth.AccessTokenTTL = accessTTL
+	cfg.Auth.RefreshTokenTTL = refreshTTL
 
 	// Support Render's PORT environment variable
 	if port := os.Getenv("PORT"); port != "" {
@@ -259,23 +282,24 @@ func Load(configPath string) (*Config, error) {
 		if !cfg.Auth.HasValidSecrets() {
 			return nil, fmt.Errorf("valid JWT secrets are required in production (set COINDISTRO_JWT_ACCESS_SECRET and COINDISTRO_JWT_REFRESH_SECRET)")
 		}
-		// Production log level should be info unless explicitly overridden
-		if v.GetString("logging.level") == "" || v.GetString("logging.level") == "debug" {
-			// Leave as-is if user explicitly set it, otherwise default to info
-			// But the default is already "info", so this is fine
-		}
 	}
 
-	// Convert minutes to duration for auth TTLs
-	cfg.Auth.AccessTokenTTL = cfg.Auth.AccessTokenTTL * time.Minute
-	cfg.Auth.RefreshTokenTTL = cfg.Auth.RefreshTokenTTL * time.Minute
-
-	// Convert seconds to duration for server timeouts
-	cfg.Server.ReadTimeout = cfg.Server.ReadTimeout * time.Second
-	cfg.Server.WriteTimeout = cfg.Server.WriteTimeout * time.Second
-	cfg.Server.IdleTimeout = cfg.Server.IdleTimeout * time.Second
+	// Convert seconds to duration for server timeouts (YAML/env integers = seconds).
+	// Only scale when the value looks like a bare unit count (not already a real duration).
+	cfg.Server.ReadTimeout = scaleIfUnitCount(cfg.Server.ReadTimeout, time.Second)
+	cfg.Server.WriteTimeout = scaleIfUnitCount(cfg.Server.WriteTimeout, time.Second)
+	cfg.Server.IdleTimeout = scaleIfUnitCount(cfg.Server.IdleTimeout, time.Second)
 
 	return &cfg, nil
+}
+
+// scaleIfUnitCount multiplies d by unit when d looks like a bare integer count
+// (from YAML/env numbers), otherwise returns d unchanged.
+func scaleIfUnitCount(d, unit time.Duration) time.Duration {
+	if isLikelyUnitCount(d) {
+		return time.Duration(int64(d)) * unit
+	}
+	return d
 }
 
 func setDefaults(v *viper.Viper) {
