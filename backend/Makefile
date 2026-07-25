@@ -67,11 +67,11 @@ docker-logs: ## View Docker logs
 
 bootstrap: ## Create Genesis Super Admin (development only)
 	@echo "Running bootstrap (development only)..."
-	@go run ./scripts/bootstrap.go
+	@go run ./scripts/bootstrap
 
 seed: ## Seed demo users, earn products, activity (development only)
 	@echo "Running seeder (development only)..."
-	@go run ./scripts/seed.go
+	@go run ./scripts/seed
 
 dev-setup: docker-up ## Start Docker then bootstrap + seed
 	@echo "Waiting for Postgres..."

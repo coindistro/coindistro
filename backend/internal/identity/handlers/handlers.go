@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -527,62 +525,6 @@ func (h *Handlers) CheckUsernameAvailability(c *gin.Context) {
 	response.OK(c, "Username availability checked", gin.H{"available": available})
 }
 
-// ─── Admin Handlers ──────────────────────────────────
-
-// AdminListUsers lists all users (admin).
-// @Summary List all users (Admin)
-// @Description Get paginated list of all users
-// @Tags Admin
-// @Security BearerAuth
-// @Param status query string false "Filter by status"
-// @Param page query int false "Page number" default(1)
-// @Param per_page query int false "Items per page" default(20)
-// @Success 200 {object} response.APIResponse
-// @Router /api/v1/admin/users [get]
-func (h *Handlers) AdminListUsers(c *gin.Context) {
-	// Implementation delegated to middleware-protected admin routes
-	response.OK(c, "List users - not implemented", nil)
-}
-
-// AdminUpdateUserStatus updates a user's status (admin).
-// @Summary Update user status (Admin)
-// @Description Update a user's account status (active, suspended, banned)
-// @Tags Admin
-// @Security BearerAuth
-// @Param id path string true "User ID"
-// @Param body body models.UpdateUserStatusRequest true "New status"
-// @Success 200 {object} response.APIResponse
-// @Router /api/v1/admin/users/{id}/status [put]
-func (h *Handlers) AdminUpdateUserStatus(c *gin.Context) {
-	response.OK(c, "Update user status - not implemented", nil)
-}
-
-// AdminUpdateRoles updates a user's roles (admin).
-// @Summary Update user roles (Admin)
-// @Description Update a user's role assignments
-// @Tags Admin
-// @Security BearerAuth
-// @Param id path string true "User ID"
-// @Param body body models.UpdateRolesRequest true "New roles"
-// @Success 200 {object} response.APIResponse
-// @Router /api/v1/admin/users/{id}/roles [put]
-func (h *Handlers) AdminUpdateRoles(c *gin.Context) {
-	response.OK(c, "Update roles - not implemented", nil)
-}
-
-// AdminUpdateInvitationCredits updates a user's invitation credits (admin).
-// @Summary Update invitation credits (Admin)
-// @Description Update a user's invitation credit balance
-// @Tags Admin
-// @Security BearerAuth
-// @Param id path string true "User ID"
-// @Param body body models.UpdateInvitationCreditsRequest true "Credits"
-// @Success 200 {object} response.APIResponse
-// @Router /api/v1/admin/users/{id}/credits [put]
-func (h *Handlers) AdminUpdateInvitationCredits(c *gin.Context) {
-	response.OK(c, "Update credits - not implemented", nil)
-}
-
 // RegisterAuthRoutes registers public auth routes on the given group.
 func RegisterAuthRoutes(rg *gin.RouterGroup, h *Handlers) {
 	auth := rg.Group("/auth")
@@ -666,12 +608,4 @@ func RegisterSecurityRoutes(rg *gin.RouterGroup, h *Handlers) {
 	{
 		security.GET("", h.GetActivityLog)
 	}
-}
-
-// RegisterAdminRoutes registers admin identity routes.
-func RegisterAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
-	rg.GET("/users", h.AdminListUsers)
-	rg.PUT("/users/:id/status", h.AdminUpdateUserStatus)
-	rg.PUT("/users/:id/roles", h.AdminUpdateRoles)
-	rg.PUT("/users/:id/credits", h.AdminUpdateInvitationCredits)
 }

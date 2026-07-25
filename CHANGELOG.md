@@ -39,8 +39,8 @@ First official alpha release of Coindistro. This milestone delivers a complete a
 
 ### Developer Experience
 
-- Bootstrap CLI (`go run ./scripts/bootstrap.go`) — creates admin/super_admin users
-- Seeder CLI (`go run ./scripts/seed.go`) — demo users, Earn products, referrals, notifications
+- Bootstrap CLI (`go run ./scripts/bootstrap`) — creates admin/super_admin users
+- Seeder CLI (`go run ./scripts/seed`) — demo users, Earn products, referrals, notifications
 - Demo super admin: `admin@coindistro.com` / `Admin@123456`
 - Demo user: `user1@coindistro.com` / `User@123456`
 - Docker Compose-based development environment

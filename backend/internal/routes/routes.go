@@ -128,12 +128,13 @@ func SetupRouter(
 		admin.Use(middleware.Authentication(authService))
 		admin.Use(middleware.RequireRole("super_admin", "admin", "moderator"))
 		{
-			registerAdminRoutes(admin, cfg, db, redis, rbacService, featureFlags, workerPool, sched, identityHandlers.Svc)
-			identityhandlers.RegisterAdminRoutes(admin, identityHandlers)
+			registerAdminRoutes(admin, cfg, db, redis, rbacService, featureFlags, workerPool, sched)
 
-			// New admin handlers for dashboard stats
-			identityAdmin := identityhandlers.NewAdminHandlers(identityHandlers.Svc, logger)
-			identityhandlers.RegisterAdminRoutes(admin, identityAdmin)
+			// Identity admin dashboard + user management (single registration)
+			if identityHandlers != nil && identityHandlers.Svc != nil {
+				identityAdmin := identityhandlers.NewAdminHandlers(identityHandlers.Svc, logger)
+				identityhandlers.RegisterAdminRoutes(admin, identityAdmin)
+			}
 		}
 	}
 
@@ -150,10 +151,6 @@ func registerAdminRoutes(
 	ff *featureflags.Manager,
 	workerPool *workers.Pool,
 	sched *scheduler.Scheduler,
-	identitySvc interface {
-		GetPlatformStats(context.Context) (*identityhandlers.PlatformStats, error)
-		GetPlatformActivityLog(context.Context, int) ([]*identityhandlers.ActivityLogResponse, error)
-	},
 ) {
 	// Live admin overview combining system + platform metadata.
 	// Identity stats are also available via GET /admin/stats.
@@ -308,18 +305,18 @@ func buildSystemStatus(
 	flags := ff.GetAllFlags()
 
 	return gin.H{
-		"status":         apiStatus,
-		"api_status":     apiStatus,
-		"database":       dbStatus,
-		"redis":          redisStatus,
-		"backend":        "healthy",
-		"docker":         "unknown",
-		"version":        cfg.App.Version,
-		"environment":    cfg.App.Environment,
-		"app_name":       cfg.App.Name,
-		"timestamp":      time.Now().UTC().Format(time.RFC3339),
-		"workers":        workerStatus,
-		"scheduler":      schedulerStatus,
-		"feature_flags":  flags,
+		"status":        apiStatus,
+		"api_status":    apiStatus,
+		"database":      dbStatus,
+		"redis":         redisStatus,
+		"backend":       "healthy",
+		"docker":        "unknown",
+		"version":       cfg.App.Version,
+		"environment":   cfg.App.Environment,
+		"app_name":      cfg.App.Name,
+		"timestamp":     time.Now().UTC().Format(time.RFC3339),
+		"workers":       workerStatus,
+		"scheduler":     schedulerStatus,
+		"feature_flags": flags,
 	}
 }

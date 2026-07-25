@@ -14,8 +14,8 @@ import (
 	"github.com/coindistro/backend/internal/email"
 	"github.com/coindistro/backend/internal/events"
 	"github.com/coindistro/backend/internal/featureflags"
-	"github.com/coindistro/backend/internal/identity/store"
 	idservice "github.com/coindistro/backend/internal/identity/service"
+	"github.com/coindistro/backend/internal/identity/store"
 	"github.com/coindistro/backend/internal/logger"
 	"github.com/coindistro/backend/internal/rbac"
 )
@@ -168,4 +168,3 @@ func OK(msg string) {
 func Info(msg string) {
 	fmt.Println(msg)
 }
-

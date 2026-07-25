@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/coindistro/backend/internal/earn/models"
 	"github.com/coindistro/backend/internal/earn/service"
 	"github.com/coindistro/backend/internal/response"
 )

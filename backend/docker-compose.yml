@@ -4,8 +4,8 @@
 #
 # Development bootstrap (from host, after Postgres is healthy):
 #   cd backend
-#   go run ./scripts/bootstrap.go
-#   go run ./scripts/seed.go
+#   go run ./scripts/bootstrap
+#   go run ./scripts/seed
 #
 # Then open http://localhost:3000
 # Login: admin@coindistro.com / Admin@123456

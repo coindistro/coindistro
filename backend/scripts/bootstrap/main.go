@@ -2,7 +2,7 @@
 //
 // Usage (from backend/):
 //
-//	go run ./scripts/bootstrap.go
+//	go run ./scripts/bootstrap
 //
 // Creates the Genesis Super Admin if one does not already exist.
 // Never runs in production environments.

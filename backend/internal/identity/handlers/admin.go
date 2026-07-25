@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/coindistro/backend/internal/identity/models"
 	"github.com/coindistro/backend/internal/identity/service"
 	"github.com/coindistro/backend/internal/response"
 )
@@ -37,13 +38,13 @@ func (h *AdminHandlers) AdminUsersList(c *gin.Context) {
 	page := 1
 	perPage := 20
 	if p := c.Query("page"); p != "" {
-		if _, err := gin.ParseInt(p, 10, 32); err == nil {
-			page = int(gin.ParseInt(p, 10, 32))
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
 		}
 	}
 	if pp := c.Query("per_page"); pp != "" {
-		if _, err := gin.ParseInt(pp, 10, 32); err == nil {
-			perPage = int(gin.ParseInt(pp, 10, 32))
+		if v, err := strconv.Atoi(pp); err == nil && v > 0 {
+			perPage = v
 		}
 	}
 
@@ -66,13 +67,13 @@ func (h *AdminHandlers) AdminUsersList(c *gin.Context) {
 func (h *AdminHandlers) AdminRecentRegistrations(c *gin.Context) {
 	limit := 10
 	if l := c.Query("limit"); l != "" {
-		if _, err := gin.ParseInt(l, 10, 32); err == nil {
-			limit = int(gin.ParseInt(l, 10, 32))
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
 		}
 	}
 
 	// This uses the existing ListUsers with empty status to get recent
-	users, err := h.svc.AdminListUsers(c.Request.Context(), "", 1, limit)
+	users, _, err := h.svc.AdminListUsers(c.Request.Context(), "", 1, limit)
 	if err != nil {
 		h.logger.Error("admin recent registrations failed", zap.Error(err))
 		response.HandleError(c, err)
@@ -85,27 +86,31 @@ func (h *AdminHandlers) AdminRecentRegistrations(c *gin.Context) {
 func (h *AdminHandlers) AdminRecentLogins(c *gin.Context) {
 	limit := 10
 	if l := c.Query("limit"); l != "" {
-		if _, err := gin.ParseInt(l, 10, 32); err == nil {
-			limit = int(gin.ParseInt(l, 10, 32))
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
 		}
 	}
 
-	// GetPlatformStats already includes recent logins
+	// GetPlatformStats already includes recent logins; trim to requested limit.
 	stats, err := h.svc.GetPlatformStats(c.Request.Context())
 	if err != nil {
 		h.logger.Error("admin recent logins failed", zap.Error(err))
 		response.HandleError(c, err)
 		return
 	}
-	response.OK(c, "Recent logins retrieved", stats.RecentLogins)
+	logins := stats.RecentLogins
+	if limit > 0 && len(logins) > limit {
+		logins = logins[:limit]
+	}
+	response.OK(c, "Recent logins retrieved", logins)
 }
 
 // AdminActivityLog returns recent activity across the platform.
 func (h *AdminHandlers) AdminActivityLog(c *gin.Context) {
 	limit := 20
 	if l := c.Query("limit"); l != "" {
-		if _, err := gin.ParseInt(l, 10, 32); err == nil {
-			limit = int(gin.ParseInt(l, 10, 32))
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
 		}
 	}
 
@@ -152,8 +157,9 @@ func (h *AdminHandlers) AdminEarnStats(c *gin.Context) {
 	})
 }
 
-// RegisterAdminRoutes registers admin identity routes.
+// RegisterAdminRoutes registers admin identity routes (single registration point).
 func RegisterAdminRoutes(rg *gin.RouterGroup, h *AdminHandlers) {
+	rg.GET("/stats", h.AdminDashboardStats)
 	rg.GET("/dashboard/stats", h.AdminDashboardStats)
 	rg.GET("/users", h.AdminUsersList)
 	rg.GET("/registrations/recent", h.AdminRecentRegistrations)

@@ -867,6 +867,255 @@ func toAdminUserSummary(u *models.User) *models.AdminUserSummary {
 	}
 }
 
+// BootstrapUserInput describes a development bootstrap / seed user.
+// Passwords are hashed with the auth package before persistence.
+type BootstrapUserInput struct {
+	Email             string
+	Username          string
+	DisplayName       string
+	Password          string
+	Roles             []string
+	Country           string
+	Timezone          string
+	InvitationCredits int
+	IsGenesis         bool
+	IsFounder         bool
+	EmailVerified     bool
+	GenesisNumber     *int
+	ReferredBy        *string
+	ReferralLevel     int
+	LastLoginAt       *time.Time
+	LastLoginIP       *string
+	LastLoginUA       *string
+}
+
+// HasSuperAdmin reports whether any super_admin user already exists.
+func (s *Service) HasSuperAdmin(ctx context.Context) (bool, error) {
+	count, err := s.store.CountUsersWithRole(ctx, "super_admin")
+	if err != nil {
+		s.logger.Error("has super admin check failed", zap.Error(err))
+		return false, apperrors.ErrInternalServer
+	}
+	return count > 0, nil
+}
+
+// GetProfileByEmail returns a user by email (used by bootstrap tooling).
+func (s *Service) GetProfileByEmail(ctx context.Context, email string) (*models.User, error) {
+	user, err := s.store.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, apperrors.ErrInternalServer
+	}
+	return user, nil
+}
+
+// BootstrapCreateUser creates a fully configured user via the Identity Service store.
+// Used only by development bootstrap/seed tooling — never exposes plaintext passwords.
+func (s *Service) BootstrapCreateUser(ctx context.Context, input BootstrapUserInput) (*models.User, error) {
+	if input.Email == "" || input.Password == "" {
+		return nil, apperrors.ErrBadRequest
+	}
+	exists, err := s.store.IsEmailTaken(ctx, input.Email)
+	if err != nil {
+		return nil, apperrors.ErrInternalServer
+	}
+	if exists {
+		return s.store.GetUserByEmail(ctx, input.Email)
+	}
+	if input.Username != "" {
+		taken, err := s.store.IsUsernameTaken(ctx, input.Username)
+		if err != nil {
+			return nil, apperrors.ErrInternalServer
+		}
+		if taken {
+			return nil, ide.ErrUsernameTaken
+		}
+	}
+
+	passwordHash, err := auth.HashPassword(input.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	roles := input.Roles
+	if len(roles) == 0 {
+		roles = []string{"user"}
+	}
+	timezone := input.Timezone
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	country := input.Country
+	now := time.Now().UTC()
+
+	user := &models.User{
+		ID:            uuidlib.NewString(),
+		Email:         strings.ToLower(strings.TrimSpace(input.Email)),
+		PasswordHash:  passwordHash,
+		Timezone:      timezone,
+		Locale:        "en",
+		ReferralCode:  s.generateReferralCode(ctx),
+		ReferredBy:    input.ReferredBy,
+		ReferralLevel: input.ReferralLevel,
+		Status:        "active",
+		Roles:         roles,
+		IsGenesis:     input.IsGenesis,
+		IsFounder:     input.IsFounder,
+		FounderBadge:  input.IsFounder,
+		GenesisNumber: input.GenesisNumber,
+	}
+	if input.Username != "" {
+		u := input.Username
+		user.Username = &u
+	}
+	if input.DisplayName != "" {
+		d := input.DisplayName
+		user.DisplayName = &d
+	}
+	if country != "" {
+		user.Country = &country
+	}
+	if input.EmailVerified {
+		user.EmailVerifiedAt = &now
+	}
+	if input.IsGenesis {
+		user.GenesisDate = &now
+		if user.GenesisNumber == nil {
+			n := 1
+			user.GenesisNumber = &n
+		}
+	}
+	if input.LastLoginAt != nil {
+		user.LastLoginAt = input.LastLoginAt
+	} else {
+		user.LastLoginAt = &now
+	}
+	if input.LastLoginIP != nil {
+		user.LastLoginIP = input.LastLoginIP
+	}
+	if input.LastLoginUA != nil {
+		user.LastLoginUserAgent = input.LastLoginUA
+	}
+
+	if err := s.store.CreateUserFull(ctx, user); err != nil {
+		s.logger.Error("bootstrap create user failed", zap.Error(err), zap.String("email", input.Email))
+		return nil, apperrors.ErrInternalServer
+	}
+
+	credits := input.InvitationCredits
+	if credits < 0 {
+		credits = s.cfg.DefaultInvitationCredits
+	}
+	_ = s.store.UpsertInvitationCredits(ctx, &models.InvitationCredit{
+		ID:           uuidlib.NewString(),
+		UserID:       user.ID,
+		TotalCredits: credits,
+	})
+
+	if input.ReferredBy != nil && *input.ReferredBy != "" {
+		referrer, _ := s.store.GetUserByID(ctx, *input.ReferredBy)
+		code := user.ReferralCode
+		if referrer != nil {
+			code = referrer.ReferralCode
+		}
+		_ = s.store.CreateReferral(ctx, &models.Referral{
+			ID:           uuidlib.NewString(),
+			ReferrerID:   *input.ReferredBy,
+			ReferredID:   user.ID,
+			ReferralCode: code,
+			Level:        input.ReferralLevel,
+			Status:       "active",
+			ConvertedAt:  &now,
+		})
+	}
+
+	if input.IsGenesis {
+		_, _ = s.store.IncrementGenesisCount(ctx)
+	}
+
+	s.audit(ctx, audit.ActionUserCreated, audit.EntityUser, user.ID, "127.0.0.1", "bootstrap", map[string]interface{}{
+		"source": "bootstrap",
+		"roles":  roles,
+	})
+	s.publishEvent(events.EventUserRegistered, map[string]interface{}{
+		"user_id": user.ID, "email": user.Email, "source": "bootstrap",
+	})
+
+	return user, nil
+}
+
+// CreateDemoSession creates an active session for a user (development seed).
+func (s *Service) CreateDemoSession(ctx context.Context, userID, ip, userAgent, browser, osName, deviceName, deviceType string, isCurrent bool) (*models.Session, error) {
+	token := s.generateToken(48)
+	now := time.Now().UTC()
+	session := &models.Session{
+		ID:               uuidlib.NewString(),
+		UserID:           userID,
+		RefreshTokenHash: s.hashToken(token),
+		Status:           "active",
+		IPAddress:        &ip,
+		UserAgent:        &userAgent,
+		Browser:          &browser,
+		OperatingSystem:  &osName,
+		DeviceName:       &deviceName,
+		DeviceType:       &deviceType,
+		IsCurrent:        isCurrent,
+		LoginAt:          now.Add(-time.Duration(1+time.Now().UnixNano()%48) * time.Hour),
+		LastActivityAt:   now,
+		ExpiresAt:        now.Add(s.cfg.SessionDuration),
+	}
+	if err := s.store.CreateSession(ctx, session); err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// CreateDemoDevice creates a device record for a user (development seed).
+func (s *Service) CreateDemoDevice(ctx context.Context, userID, name, browser, osName, deviceType string, trusted, current bool) (*models.Device, error) {
+	now := time.Now().UTC()
+	fp := uuidlib.NewString()
+	device := &models.Device{
+		ID:              uuidlib.NewString(),
+		UserID:          userID,
+		Fingerprint:     &fp,
+		Name:            &name,
+		Browser:         &browser,
+		OperatingSystem: &osName,
+		DeviceType:      &deviceType,
+		IsTrusted:       trusted,
+		IsCurrent:       current,
+		LastSeenAt:      now,
+		FirstSeenAt:     now.Add(-72 * time.Hour),
+	}
+	if err := s.store.UpsertDevice(ctx, device); err != nil {
+		return nil, err
+	}
+	return device, nil
+}
+
+// LogDemoActivity writes an activity log entry (development seed / notifications).
+func (s *Service) LogDemoActivity(ctx context.Context, userID, action, ip, userAgent string, details map[string]interface{}) error {
+	return s.LogDemoActivityAt(ctx, userID, action, ip, userAgent, details, time.Now().UTC())
+}
+
+// LogDemoActivityAt writes an activity log entry with a specific timestamp.
+func (s *Service) LogDemoActivityAt(ctx context.Context, userID, action, ip, userAgent string, details map[string]interface{}, at time.Time) error {
+	if details == nil {
+		details = map[string]interface{}{}
+	}
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	return s.store.LogActivity(ctx, &models.ActivityLog{
+		ID:        uuidlib.NewString(),
+		UserID:    userID,
+		Action:    action,
+		IPAddress: &ip,
+		UserAgent: &userAgent,
+		Details:   details,
+		CreatedAt: at,
+	})
+}
+
 // ─── Internal helpers ─────────────────────────────────
 
 func (s *Service) generateReferralCode(ctx context.Context) string {

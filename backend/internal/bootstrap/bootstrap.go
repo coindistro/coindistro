@@ -14,8 +14,8 @@ import (
 
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
-	idservice "github.com/coindistro/backend/internal/identity/service"
 	"github.com/coindistro/backend/internal/identity/models"
+	idservice "github.com/coindistro/backend/internal/identity/service"
 )
 
 // SuperAdminCredentials are the default Genesis Super Admin credentials (development only).

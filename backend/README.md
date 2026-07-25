@@ -124,8 +124,8 @@ After Docker is healthy, initialize the platform and load demo data:
 
 ```bash
 # From backend/
-go run ./scripts/bootstrap.go   # Genesis Super Admin only
-go run ./scripts/seed.go        # Full demo dataset
+go run ./scripts/bootstrap   # Genesis Super Admin only
+go run ./scripts/seed        # Full demo dataset
 ```
 
 Or via Make:

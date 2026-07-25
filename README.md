@@ -20,10 +20,10 @@ docker compose up -d
 
 # Bootstrap admin/super_admin users
 cd backend
-go run ./scripts/bootstrap.go
+go run ./scripts/bootstrap
 
 # Seed demo data (users, Earn products, referrals, notifications)
-go run ./scripts/seed.go
+go run ./scripts/seed
 
 # Start the backend API
 make run
@@ -210,8 +210,8 @@ cp .env.example .env
 docker compose up -d postgres redis
 
 # Development bootstrap + demo data (Identity Service; never runs in production)
-go run ./scripts/bootstrap.go
-go run ./scripts/seed.go
+go run ./scripts/bootstrap
+go run ./scripts/seed
 # Super Admin: admin@coindistro.com / Admin@123456
 # User:        user1@coindistro.com / User@123456
 

@@ -331,16 +331,16 @@ type AdminUserSummary struct {
 
 // PlatformStats holds aggregate identity metrics for the admin overview.
 type PlatformStats struct {
-	TotalUsers         int                  `json:"total_users"`
-	VerifiedUsers      int                  `json:"verified_users"`
-	GenesisMembers     int                  `json:"genesis_members"`
-	ActiveUsers        int                  `json:"active_users"`
-	TotalReferrals     int                  `json:"total_referrals"`
-	TotalInvitations   int                  `json:"total_invitations"`
-	RecentRegistrations []*AdminUserSummary `json:"recent_registrations"`
-	RecentLogins        []*AdminUserSummary `json:"recent_logins"`
+	TotalUsers          int                    `json:"total_users"`
+	VerifiedUsers       int                    `json:"verified_users"`
+	GenesisMembers      int                    `json:"genesis_members"`
+	ActiveUsers         int                    `json:"active_users"`
+	TotalReferrals      int                    `json:"total_referrals"`
+	TotalInvitations    int                    `json:"total_invitations"`
+	RecentRegistrations []*AdminUserSummary    `json:"recent_registrations"`
+	RecentLogins        []*AdminUserSummary    `json:"recent_logins"`
 	RecentActivity      []*ActivityLogResponse `json:"recent_activity"`
-	GenesisConfig       *GenesisConfig      `json:"genesis_config,omitempty"`
+	GenesisConfig       *GenesisConfig         `json:"genesis_config,omitempty"`
 }
 
 // ToResponse converts a User model to a UserResponse.

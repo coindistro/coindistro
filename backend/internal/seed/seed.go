@@ -29,12 +29,12 @@ const (
 
 // Dependencies for the seeder.
 type Dependencies struct {
-	Config   *config.Config
-	DB       *database.Database
-	Identity *idservice.Service
-	Earn     *earnservice.Service
+	Config    *config.Config
+	DB        *database.Database
+	Identity  *idservice.Service
+	Earn      *earnservice.Service
 	EarnStore *earnstore.Store
-	Logger   *zap.Logger
+	Logger    *zap.Logger
 }
 
 // Progress is called with human-readable status lines.
@@ -42,11 +42,11 @@ type Progress func(step string)
 
 // Result summarizes what was seeded.
 type Result struct {
-	SuperAdmin *models.User
-	Admins     []*models.User
-	Moderator  *models.User
-	Users      []*models.User
-	Products   []*earnmodels.Product
+	SuperAdmin     *models.User
+	Admins         []*models.User
+	Moderator      *models.User
+	Users          []*models.User
+	Products       []*earnmodels.Product
 	Participations int
 }
 
@@ -400,37 +400,37 @@ func seedEarnProducts(ctx context.Context, deps Dependencies, actorID string) ([
 		{
 			Name: "Flexible USDT Earn", Slug: "flexible-usdt-earn",
 			Description: "Flexible USDT savings with daily rewards. Withdraw anytime.",
-			Category: earnmodels.CategoryFlexible, SupportedAssets: []string{"USDT"},
+			Category:    earnmodels.CategoryFlexible, SupportedAssets: []string{"USDT"},
 			CapacityTotal: &capTotal, RiskLevel: "low", MinAllocation: 10, MaxAllocation: &maxAlloc,
 			RewardModel: "flexible", RewardAPR: 8.5, Featured: true, Status: earnmodels.StatusActive,
 		},
 		{
 			Name: "Fixed BTC Earn", Slug: "fixed-btc-earn",
 			Description: "Lock Bitcoin for fixed duration yield.",
-			Category: earnmodels.CategoryFixed, SupportedAssets: []string{"BTC"},
+			Category:    earnmodels.CategoryFixed, SupportedAssets: []string{"BTC"},
 			DurationDays: &d90, CapacityTotal: &capTotal, RiskLevel: "medium", MinAllocation: 0.001,
 			RewardModel: "fixed", RewardAPR: 5.2, Featured: true, Status: earnmodels.StatusActive,
 		},
 		{
 			Name: "ETH Staking", Slug: "eth-staking",
 			Description: "Stake Ethereum and earn network rewards.",
-			Category: earnmodels.CategoryFixed, SupportedAssets: []string{"ETH"},
+			Category:    earnmodels.CategoryFixed, SupportedAssets: []string{"ETH"},
 			DurationDays: &d30, CapacityTotal: &capTotal, RiskLevel: "medium", MinAllocation: 0.01,
 			RewardModel: "fixed", RewardAPR: 4.8, Featured: false, Status: earnmodels.StatusActive,
 		},
 		{
 			Name: "AI Smart Earn", Slug: "ai-smart-earn",
 			Description: "AI-optimized multi-asset yield strategies.",
-			Category: earnmodels.CategoryAISmart, SupportedAssets: []string{"USDT", "USDC", "BTC"},
+			Category:    earnmodels.CategoryAISmart, SupportedAssets: []string{"USDT", "USDC", "BTC"},
 			CapacityTotal: &capTotal, RiskLevel: "medium", MinAllocation: 50, MaxAllocation: &maxAlloc,
 			RewardModel: "flexible", RewardAPR: 12.0,
 			StrategyProfiles: []string{"conservative", "balanced", "growth", "aggressive"},
-			Featured: true, Status: earnmodels.StatusActive,
+			Featured:         true, Status: earnmodels.StatusActive,
 		},
 		{
 			Name: "Signal Vault", Slug: "signal-vault",
 			Description: "Vault linked to curated trading signal performance.",
-			Category: earnmodels.CategorySignalVault, SupportedAssets: []string{"USDT"},
+			Category:    earnmodels.CategorySignalVault, SupportedAssets: []string{"USDT"},
 			CapacityTotal: &capTotal, RiskLevel: "high", MinAllocation: 25, MaxAllocation: &maxAlloc,
 			RewardModel: "promotional", RewardAPR: 15.0, Featured: true, Status: earnmodels.StatusActive,
 		},

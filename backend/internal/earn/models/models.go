@@ -343,6 +343,6 @@ type ProductListFilter struct {
 }
 
 type EarnPlatformStats struct {
-	ActiveProducts       int     `json:"active_products"`
-	ActiveParticipants   int     `json:"active_participants"`
+	ActiveProducts     int `json:"active_products"`
+	ActiveParticipants int `json:"active_participants"`
 }

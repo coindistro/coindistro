@@ -2,7 +2,7 @@
 //
 // Usage (from backend/):
 //
-//	go run ./scripts/seed.go
+//	go run ./scripts/seed
 //
 // Populates the database with Super Admin, demo users, sessions, activity,
 // referrals, Earn products, participations, and rewards.
