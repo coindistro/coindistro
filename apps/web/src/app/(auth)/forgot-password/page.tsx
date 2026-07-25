@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      await forgotPassword(values.email);
+      await forgotPassword({ email: values.email });
       setDone(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Request failed");

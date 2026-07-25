@@ -36,7 +36,10 @@ export default function ResetPasswordPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      await resetPassword(token, values.password);
+      await resetPassword({
+        token,
+        password: values.password,
+      });
       router.replace("/login?reset=1");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Reset failed");

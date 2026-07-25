@@ -95,11 +95,15 @@ export function AdminChrome({ children }: { children: React.ReactNode }) {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="Admin menu">
+              <button
+                type="button"
+                aria-label="Admin menu"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent"
+              >
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="text-xs">AD</AvatarFallback>
                 </Avatar>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>

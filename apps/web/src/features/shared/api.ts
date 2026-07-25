@@ -49,6 +49,46 @@ import type {
   CompleteLearnInput,
 } from "@/features/shared/api-types";
 
+// Re-export types so feature modules can import from one place.
+export type {
+  LoginInput,
+  RegisterInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  VerifyEmailInput,
+  ChangePasswordInput,
+  AuthPayload,
+  AuthUser,
+  UserProfile,
+  UpdateProfileInput,
+  Session,
+  Device,
+  ActivityLog,
+  ReferralDashboard,
+  Invitation,
+  PlatformStats,
+  SystemStatus,
+  AdminUserSummary,
+  FeatureFlags,
+  EarnProduct,
+  EarnProductListFilter,
+  PortfolioOverview,
+  Participation,
+  Reward,
+  Transaction,
+  LaunchpoolCampaign,
+  LearnCampaign,
+  LearnCompletion,
+  ReferralRewardSummary,
+  ProductAnalytics,
+  PaginatedResponse,
+  JoinProductInput,
+  AddFundsInput,
+  WithdrawInput,
+  ExitParticipationInput,
+  CompleteLearnInput,
+} from "@/features/shared/api-types";
+
 // ============================================================
 // AUTHENTICATION
 // ============================================================

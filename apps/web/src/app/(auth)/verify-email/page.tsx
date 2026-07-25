@@ -19,7 +19,7 @@ export default function VerifyEmailPage() {
       setMessage("Missing verification token.");
       return;
     }
-    verifyEmail(token)
+    verifyEmail({ token })
       .then(() => setStatus("ok"))
       .catch((e) => {
         setStatus("error");

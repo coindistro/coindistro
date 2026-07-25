@@ -5,26 +5,20 @@
 
 import {
   api,
-  type RequestOptions,
-  setUnauthorizedHandler,
   loadAuthTokensFromStorage,
+  setUnauthorizedHandler,
 } from "@/lib/api/client";
-import type {
-  ApiResponse,
-  AuthUser,
-  AuthPayload,
-  ReferralDashboard,
-  SessionInfo,
-  DeviceInfo,
-  ActivityLog,
-  Invitation,
-  EarnPortfolio,
-  AdminUserSummary,
-  PlatformStats,
-  SystemStatus,
-  FeatureFlag,
-  HealthResponse,
+import {
   ApiError,
+  type AuthPayload,
+  type ReferralDashboard,
+  type SessionInfo,
+  type DeviceInfo,
+  type ActivityLog,
+  type Invitation,
+  type AdminUserSummary,
+  type FeatureFlag,
+  type HealthResponse,
 } from "@/lib/api/types";
 
 // Initialize token loading on client side
@@ -33,19 +27,17 @@ if (typeof window !== "undefined") {
 }
 
 // ─── Generic Request Wrapper ──────────────────────────────────
+// The shared `api` client already unwraps the backend envelope and throws ApiError.
+// This helper only normalizes unexpected non-ApiError failures.
 
-function handleApiError(error: unknown): never {
-  if (error instanceof ApiError) throw error;
-  if (error instanceof Error) throw new ApiError(0, "NETWORK_ERROR", error.message);
-  throw new ApiError(0, "UNKNOWN_ERROR", "An unknown error occurred");
-}
-
-function unwrap<T>(promise: Promise<ApiResponse<T>>): Promise<T> {
-  return promise.then((res) => {
-    if (res.success && res.data !== undefined) return res.data;
-    if (!res.success && res.error) throw new ApiError(0, res.error.code, res.error.message, res.error.details);
-    return res.data as T;
-  });
+async function unwrap<T>(promise: Promise<T>): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error) throw new ApiError(0, "NETWORK_ERROR", error.message);
+    throw new ApiError(0, "UNKNOWN_ERROR", "An unknown error occurred");
+  }
 }
 
 // ─── Authentication API ───────────────────────────────────────

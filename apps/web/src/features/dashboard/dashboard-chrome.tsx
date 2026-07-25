@@ -110,13 +110,17 @@ export function UserDashboardChrome({ children }: { children: React.ReactNode })
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" aria-label="User menu">
+              <button
+                type="button"
+                aria-label="User menu"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent"
+              >
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="text-xs">
                     {(user?.display_name || user?.email || "U").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="truncate">

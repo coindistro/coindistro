@@ -129,15 +129,15 @@ export async function getActivityLog(): Promise<ActivityLog[]> {
 }
 
 export async function checkEmailAvailability(email: string): Promise<boolean> {
-  const res = await api.get<{ available: boolean }>("/api/v1/users/check-email", {
-    query: { email },
-  });
+  const res = await api.get<{ available: boolean }>(
+    `/api/v1/users/check-email?email=${encodeURIComponent(email)}`,
+  );
   return res.available;
 }
 
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
-  const res = await api.get<{ available: boolean }>("/api/v1/users/check-username", {
-    query: { username },
-  });
+  const res = await api.get<{ available: boolean }>(
+    `/api/v1/users/check-username?username=${encodeURIComponent(username)}`,
+  );
   return res.available;
 }
