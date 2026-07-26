@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/coindistro/backend/internal/auth"
+	"github.com/coindistro/backend/internal/bootstrap"
 	"github.com/coindistro/backend/internal/cache"
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
@@ -80,6 +81,11 @@ func New(cfg *config.Config) (*Server, error) {
 		if err != nil {
 			log.Warn("database connection failed, continuing without database", zap.Error(err))
 			db = nil
+		} else {
+			migDir := bootstrap.ResolveMigrationsDir()
+			if err := bootstrap.RunMigrations(context.Background(), db, migDir, log.Logger); err != nil {
+				return nil, fmt.Errorf("database migrations failed: %w", err)
+			}
 		}
 	} else {
 		log.Info("database not configured, running without database")

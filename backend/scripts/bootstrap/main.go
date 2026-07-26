@@ -36,7 +36,7 @@ func main() {
 	}
 
 	bootstrap.OK("Running migrations...")
-	if err := bootstrap.RunMigrations(ctx, rt.DB, bootstrap.ResolveMigrationsDir()); err != nil {
+	if err := bootstrap.RunMigrations(ctx, rt.DB, bootstrap.ResolveMigrationsDir(), rt.Logger.Logger); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: migrations failed: %v\n", err)
 		os.Exit(1)
 	}

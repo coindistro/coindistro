@@ -73,7 +73,7 @@ func Run(ctx context.Context, deps Dependencies, progress Progress) (*Result, er
 
 	progress("Running migrations...")
 	migDir := bootstrap.ResolveMigrationsDir()
-	if err := bootstrap.RunMigrations(ctx, deps.DB, migDir); err != nil {
+	if err := bootstrap.RunMigrations(ctx, deps.DB, migDir, log); err != nil {
 		return nil, fmt.Errorf("migrations: %w", err)
 	}
 

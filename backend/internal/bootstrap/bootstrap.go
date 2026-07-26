@@ -4,6 +4,8 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +13,9 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
@@ -123,14 +128,97 @@ func Run(ctx context.Context, deps Dependencies) (*Result, error) {
 }
 
 // RunMigrations applies SQL files from migrationsDir in lexical order.
-// Safe to re-run when migrations use IF NOT EXISTS.
-func RunMigrations(ctx context.Context, db *database.Database, migrationsDir string) error {
+// It records applied versions in schema_migrations and is safe to re-run.
+func RunMigrations(ctx context.Context, db *database.Database, migrationsDir string, logger *zap.Logger) error {
 	if db == nil || db.Pool == nil {
 		return fmt.Errorf("database is required")
 	}
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	logger.Info("starting database migrations", zap.String("migrations_dir", migrationsDir))
+	if err := runMigrations(ctx, db.Pool, migrationsDir, logger); err != nil {
+		return err
+	}
+	logger.Info("database schema ready")
+	return nil
+}
+
+type migrationTx interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Commit(ctx context.Context) error
+	Rollback(ctx context.Context) error
+}
+
+type migrationClient interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+func runMigrations(ctx context.Context, db migrationClient, migrationsDir string, logger *zap.Logger) error {
+	if err := ensureSchemaMigrationsTable(ctx, db); err != nil {
+		return err
+	}
+	files, err := findMigrationFiles(migrationsDir)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no migration files found in %s", migrationsDir)
+	}
+	applied, err := appliedMigrations(ctx, db)
+	if err != nil {
+		return fmt.Errorf("read applied migrations: %w", err)
+	}
+	pending := make([]string, 0, len(files))
+	for _, path := range files {
+		if _, ok := applied[filepath.Base(path)]; !ok {
+			pending = append(pending, path)
+		}
+	}
+	logger.Info("found pending migrations", zap.Int("count", len(pending)))
+	for _, path := range pending {
+		name := filepath.Base(path)
+		logger.Info("applying migration", zap.String("migration", name))
+		sqlBytes, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read migration %s: %w", path, err)
+		}
+		sql := string(sqlBytes)
+		if strings.TrimSpace(sql) == "" {
+			logger.Info("skipping empty migration", zap.String("migration", name))
+			continue
+		}
+		checksum := checksum(sqlBytes)
+		tx, err := db.Begin(ctx)
+		if err != nil {
+			return fmt.Errorf("begin migration transaction: %w", err)
+		}
+		if _, err := tx.Exec(ctx, sql); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("apply migration %s: %w", name, err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1, $2, NOW())`,
+			name,
+			checksum,
+		); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("record migration %s: %w", name, err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit migration %s: %w", name, err)
+		}
+		logger.Info("migration successful", zap.String("migration", name))
+	}
+	return nil
+}
+
+func findMigrationFiles(migrationsDir string) ([]string, error) {
 	entries, err := os.ReadDir(migrationsDir)
 	if err != nil {
-		return fmt.Errorf("read migrations dir: %w", err)
+		return nil, fmt.Errorf("read migrations dir: %w", err)
 	}
 	var files []string
 	for _, e := range entries {
@@ -143,41 +231,54 @@ func RunMigrations(ctx context.Context, db *database.Database, migrationsDir str
 		}
 	}
 	sort.Strings(files)
-	if len(files) == 0 {
-		return fmt.Errorf("no migration files found in %s", migrationsDir)
-	}
-
-	for _, path := range files {
-		sqlBytes, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read migration %s: %w", path, err)
-		}
-		sql := string(sqlBytes)
-		if strings.TrimSpace(sql) == "" {
-			continue
-		}
-		if _, err := db.Pool.Exec(ctx, sql); err != nil {
-			// Allow partially re-applied migrations (e.g. duplicate index names).
-			if isIgnorableMigrationError(err) {
-				continue
-			}
-			return fmt.Errorf("apply migration %s: %w", filepath.Base(path), err)
-		}
-	}
-	return nil
+	return files, nil
 }
 
-func isIgnorableMigrationError(err error) bool {
-	if err == nil {
-		return false
+func AppliedMigrations(ctx context.Context, db *database.Database) (map[string]string, error) {
+	if db == nil || db.Pool == nil {
+		return nil, fmt.Errorf("database is required")
 	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "already exists") ||
-		strings.Contains(msg, "duplicate key")
+	return appliedMigrations(ctx, db.Pool)
+}
+
+func appliedMigrations(ctx context.Context, db migrationClient) (map[string]string, error) {
+	rows, err := db.Query(ctx, `SELECT version, checksum FROM schema_migrations ORDER BY version ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	migrations := make(map[string]string)
+	for rows.Next() {
+		var version, checksum string
+		if err := rows.Scan(&version, &checksum); err != nil {
+			return nil, err
+		}
+		migrations[version] = checksum
+	}
+	return migrations, rows.Err()
+}
+
+func ensureSchemaMigrationsTable(ctx context.Context, db migrationClient) error {
+	_, err := db.Exec(ctx, `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    checksum TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`)
+	return err
+}
+
+func checksum(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
 }
 
 // ResolveMigrationsDir finds the migrations folder relative to common working directories.
 func ResolveMigrationsDir() string {
+	if env := strings.TrimSpace(os.Getenv("COINDISTRO_MIGRATIONS_DIR")); env != "" {
+		return env
+	}
 	candidates := []string{
 		"migrations",
 		"./migrations",

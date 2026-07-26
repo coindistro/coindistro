@@ -2,7 +2,9 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -64,6 +66,13 @@ func (h *Checker) Health(c *gin.Context) {
 			h.logger.Error("health check: database unhealthy", zap.Error(err))
 		} else {
 			checks["database"] = "healthy"
+			if tableErr := h.verifySchema(ctx); tableErr != nil {
+				checks["schema"] = "unhealthy: " + tableErr.Error()
+				overallStatus = "degraded"
+				h.logger.Error("health check: schema unhealthy", zap.Error(tableErr))
+			} else {
+				checks["schema"] = "healthy"
+			}
 		}
 	} else {
 		checks["database"] = "not_configured"
@@ -112,6 +121,9 @@ func (h *Checker) Ready(c *gin.Context) {
 		if err := h.db.Ping(ctx); err != nil {
 			checks["database"] = "not_ready: " + err.Error()
 			allReady = false
+		} else if tableErr := h.verifySchema(ctx); tableErr != nil {
+			checks["schema"] = "not_ready: " + tableErr.Error()
+			allReady = false
 		} else {
 			checks["database"] = "ready"
 		}
@@ -153,4 +165,47 @@ func (h *Checker) Live(c *gin.Context) {
 		"status":    "alive",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+func (h *Checker) verifySchema(ctx context.Context) error {
+	requiredTables := []string{"identity_users", "sessions", "refresh_tokens", "audit_logs", "schema_migrations"}
+	found, err := h.existingTables(ctx, requiredTables)
+	if err != nil {
+		return err
+	}
+	missing := requiredTables[:0]
+	for _, table := range requiredTables {
+		if !found[table] {
+			missing = append(missing, table)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required tables: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+func (h *Checker) existingTables(ctx context.Context, tables []string) (map[string]bool, error) {
+	rows, err := h.db.Pool.Query(ctx, `
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name = ANY($1)
+`, tables)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	found := make(map[string]bool, len(tables))
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		found[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return found, nil
 }
