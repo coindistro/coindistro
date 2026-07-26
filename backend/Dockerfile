@@ -31,6 +31,10 @@ COPY --from=builder /app/bin/api /app/api
 # Copy configuration
 COPY --from=builder /app/configs /app/configs
 
+# ── Critical: Copy migration files for production startup ──
+# Without these, Render/production fails with missing tables.
+COPY --from=builder /app/migrations /app/migrations
+
 # Create non-root user
 RUN adduser -D -g '' appuser && \
     chown -R appuser:appuser /app
@@ -40,7 +44,7 @@ USER appuser
 # Render injects PORT env var; no hardcoded port needed
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
 
 ENTRYPOINT ["/app/api"]

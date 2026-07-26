@@ -82,10 +82,13 @@ func New(cfg *config.Config) (*Server, error) {
 			log.Warn("database connection failed, continuing without database", zap.Error(err))
 			db = nil
 		} else {
+			log.Info("starting database migrations")
 			migDir := bootstrap.ResolveMigrationsDir()
+			log.Info("resolved migrations directory", zap.String("path", migDir))
 			if err := bootstrap.RunMigrations(context.Background(), db, migDir, log.Logger); err != nil {
 				return nil, fmt.Errorf("database migrations failed: %w", err)
 			}
+			log.Info("database schema ready")
 		}
 	} else {
 		log.Info("database not configured, running without database")
