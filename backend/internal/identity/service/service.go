@@ -266,33 +266,78 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest, ip,
 
 // Login authenticates a user and returns tokens.
 func (s *Service) Login(ctx context.Context, req *models.LoginRequest, ip, userAgent string) (*models.AuthResponse, error) {
+	s.logger.Info("login request received",
+		zap.String("email", req.Email),
+		zap.String("ip", ip),
+	)
+
 	user, err := s.store.GetUserByEmail(ctx, req.Email)
 	if err != nil {
+		s.logger.Error("login failed: user lookup",
+			zap.String("step", "user_lookup"),
+			zap.String("email", req.Email),
+			zap.Error(err),
+		)
 		return nil, apperrors.ErrInternalServer
 	}
-	if user == nil {
-		return nil, ide.ErrInvalidCredentials
-	}
+	s.logger.Info("login: user found",
+		zap.String("step", "user_found"),
+		zap.String("email", req.Email),
+		zap.String("user_id", user.ID),
+		zap.String("status", user.Status),
+	)
 
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		s.logger.Warn("login failed: account locked",
+			zap.String("step", "account_locked"),
+			zap.String("email", req.Email),
+			zap.Time("locked_until", *user.LockedUntil),
+		)
 		return nil, ide.ErrAccountLocked
 	}
 	if user.Status == "suspended" {
+		s.logger.Warn("login failed: account suspended",
+			zap.String("step", "account_suspended"),
+			zap.String("email", req.Email),
+		)
 		return nil, ide.ErrAccountSuspended
 	}
 	if user.Status == "banned" {
+		s.logger.Warn("login failed: account banned",
+			zap.String("step", "account_banned"),
+			zap.String("email", req.Email),
+		)
 		return nil, ide.ErrAccountBanned
 	}
 	if user.Status == "pending" {
+		s.logger.Warn("login failed: account not verified",
+			zap.String("step", "account_not_verified"),
+			zap.String("email", req.Email),
+		)
 		return nil, ide.ErrAccountNotVerified
 	}
 
+	s.logger.Info("login: password verification started",
+		zap.String("step", "password_verification"),
+		zap.String("email", req.Email),
+	)
 	if err := auth.VerifyPassword(req.Password, user.PasswordHash); err != nil {
 		attempts := user.FailedLoginAttempts + 1
+		s.logger.Warn("login failed: invalid password",
+			zap.String("step", "password_verification"),
+			zap.String("email", req.Email),
+			zap.Int("failed_attempts", attempts),
+		)
 		var lockedUntil *time.Time
 		if attempts >= s.cfg.MaxFailedLoginAttempts {
 			t := time.Now().Add(s.cfg.AccountLockoutDuration)
 			lockedUntil = &t
+			s.logger.Warn("login: account locked due to max attempts",
+				zap.String("step", "account_locked"),
+				zap.String("email", req.Email),
+				zap.Int("attempts", attempts),
+				zap.Time("locked_until", *lockedUntil),
+			)
 		}
 		_ = s.store.RecordFailedLogin(ctx, user.ID, attempts, lockedUntil)
 		s.audit(ctx, audit.ActionLoginFailed, audit.EntityUser, user.ID, ip, userAgent, map[string]interface{}{
@@ -303,19 +348,70 @@ func (s *Service) Login(ctx context.Context, req *models.LoginRequest, ip, userA
 		}
 		return nil, ide.ErrInvalidCredentials
 	}
+	s.logger.Info("login: password verified",
+		zap.String("step", "password_verified"),
+		zap.String("email", req.Email),
+	)
 
+	s.logger.Info("login: recording login",
+		zap.String("step", "record_login"),
+		zap.String("email", req.Email),
+	)
 	_ = s.store.RecordLogin(ctx, user.ID, ip, userAgent)
+
+	s.logger.Info("login: JWT generation started",
+		zap.String("step", "jwt_generation"),
+		zap.String("email", req.Email),
+	)
 	tokenPair, err := s.auth.GenerateTokenPair(user.ID, user.Email, user.Roles)
 	if err != nil {
+		s.logger.Error("login failed: token generation",
+			zap.String("step", "jwt_generation"),
+			zap.String("email", req.Email),
+			zap.String("user_id", user.ID),
+			zap.Error(err),
+		)
 		return nil, apperrors.ErrInternalServer
 	}
+	s.logger.Info("login: access token generated",
+		zap.String("step", "access_token_generated"),
+		zap.String("email", req.Email),
+	)
+	s.logger.Info("login: refresh token generated",
+		zap.String("step", "refresh_token_generated"),
+		zap.String("email", req.Email),
+	)
+
+	s.logger.Info("login: session creation started",
+		zap.String("step", "session_creation"),
+		zap.String("email", req.Email),
+	)
 	session := s.buildSession(ctx, user.ID, tokenPair.RefreshToken, ip, userAgent)
-	_ = s.store.CreateSession(ctx, session)
+	if err := s.store.CreateSession(ctx, session); err != nil {
+		s.logger.Error("login failed: session creation",
+			zap.String("step", "session_creation"),
+			zap.String("email", req.Email),
+			zap.String("user_id", user.ID),
+			zap.Error(err),
+		)
+		// Non-fatal: continue even if session creation fails
+	} else {
+		s.logger.Info("login: session saved",
+			zap.String("step", "session_saved"),
+			zap.String("email", req.Email),
+			zap.String("session_id", session.ID),
+		)
+	}
 
 	s.publishEvent(events.EventUserLoggedIn, map[string]interface{}{
 		"user_id": user.ID, "email": user.Email,
 	})
 	s.audit(ctx, audit.ActionLogin, audit.EntityUser, user.ID, ip, userAgent, nil)
+
+	s.logger.Info("login: response returned",
+		zap.String("step", "response_returned"),
+		zap.String("email", req.Email),
+	)
 
 	return &models.AuthResponse{
 		User:         user.ToResponse(),

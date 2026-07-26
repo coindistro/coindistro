@@ -64,6 +64,10 @@ func (h *Handlers) Register(c *gin.Context) {
 func (h *Handlers) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn("login: bad request",
+			zap.String("step", "parse_request"),
+			zap.Error(err),
+		)
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -71,12 +75,27 @@ func (h *Handlers) Login(c *gin.Context) {
 	ip := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 
+	h.logger.Info("login: handler processing",
+		zap.String("step", "handler_login"),
+		zap.String("email", req.Email),
+		zap.String("ip", ip),
+	)
+
 	result, err := h.Svc.Login(c.Request.Context(), &req, ip, userAgent)
 	if err != nil {
+		h.logger.Error("login: handler error",
+			zap.String("step", "handler_error"),
+			zap.String("email", req.Email),
+			zap.Error(err),
+		)
 		response.HandleError(c, err)
 		return
 	}
 
+	h.logger.Info("login: handler success",
+		zap.String("step", "handler_success"),
+		zap.String("email", req.Email),
+	)
 	response.OK(c, "Login successful", result)
 }
 

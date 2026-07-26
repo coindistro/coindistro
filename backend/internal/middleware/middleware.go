@@ -21,6 +21,9 @@ import (
 // Logger returns a middleware that logs HTTP requests using Zap.
 func Logger(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Store logger in context for downstream use (e.g., response.HandleError)
+		c.Set("logger", logger)
+
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery

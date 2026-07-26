@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 
 	apperrors "github.com/coindistro/backend/internal/errors"
 )
@@ -76,8 +77,21 @@ func ErrorWithDetails(c *gin.Context, statusCode int, code string, message strin
 }
 
 // HandleError handles application errors and sends appropriate responses.
+// It logs the original error before responding.
 func HandleError(c *gin.Context, err error) {
 	if appErr := apperrors.GetAppError(err); appErr != nil {
+		// Log internal server errors with full context
+		if appErr.StatusCode >= 500 {
+			logger := extractLogger(c)
+			if logger != nil {
+				logger.Error("internal server error",
+					zap.String("path", c.Request.URL.Path),
+					zap.String("method", c.Request.Method),
+					zap.String("error_code", appErr.Code),
+					zap.Error(err),
+				)
+			}
+		}
 		Error(c, appErr.StatusCode, appErr.Code, appErr.Message)
 		return
 	}
@@ -92,8 +106,31 @@ func HandleError(c *gin.Context, err error) {
 		return
 	}
 
+	// Log unknown errors before returning generic 500
+	logger := extractLogger(c)
+	if logger != nil {
+		logger.Error("unhandled error converted to 500",
+			zap.String("path", c.Request.URL.Path),
+			zap.String("method", c.Request.Method),
+			zap.Error(err),
+		)
+	}
+
 	// Default to internal server error
 	Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "An unexpected error occurred")
+}
+
+// extractLogger attempts to retrieve a zap.Logger from the Gin context.
+// Returns nil if no logger is set.
+func extractLogger(c *gin.Context) *zap.Logger {
+	logger, exists := c.Get("logger")
+	if !exists {
+		return nil
+	}
+	if l, ok := logger.(*zap.Logger); ok {
+		return l
+	}
+	return nil
 }
 
 // Created sends a 201 Created response.
