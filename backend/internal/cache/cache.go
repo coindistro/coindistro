@@ -48,10 +48,11 @@ func New(cfg config.RedisConfig, logger *zap.Logger) (*Cache, error) {
 		status: "not_configured",
 	}
 
-	logger.Info("Redis enabled",
+	logger.Info("Redis configuration",
 		zap.String("redis_host", cfg.Host),
 		zap.Int("redis_port", cfg.Port),
 		zap.Bool("tls_enabled", cfg.TLSEnabled),
+		zap.Bool("password_present", cfg.Password != ""),
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -59,10 +60,12 @@ func New(cfg config.RedisConfig, logger *zap.Logger) (*Cache, error) {
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		cache.setError(err)
-		logger.Warn("redis connection failed",
+		logger.Error("redis ping failed",
 			zap.String("host", cfg.Host),
 			zap.Int("port", cfg.Port),
 			zap.Bool("tls_enabled", cfg.TLSEnabled),
+			zap.Bool("password_present", cfg.Password != ""),
+			zap.String("reason", cache.status),
 			zap.Error(err),
 		)
 		return cache, nil
@@ -98,6 +101,14 @@ func classifyRedisError(err error) string {
 	switch {
 	case strings.Contains(msg, "auth") || strings.Contains(msg, "password") || strings.Contains(msg, "noauth") || strings.Contains(msg, "wrongpass"):
 		return "authentication_failed"
+	case strings.Contains(msg, "handshake") || strings.Contains(msg, "tls"):
+		return "tls_handshake_failed"
+	case strings.Contains(msg, "connection refused") || strings.Contains(msg, "connect: connection refused"):
+		return "connection_refused"
+	case strings.Contains(msg, "no such host") || strings.Contains(msg, "lookup") || strings.Contains(msg, "nodename"):
+		return "dns_lookup_failed"
+	case strings.Contains(msg, "eof"):
+		return "eof"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
 		return "timeout"
 	default:
@@ -113,6 +124,30 @@ func (c *Cache) HealthStatus() string {
 		return "not_configured"
 	}
 	return c.status
+}
+
+func (c *Cache) LastError() error {
+	if c == nil {
+		return nil
+	}
+	return c.lastErr
+}
+
+func (c *Cache) DiagnosticSummary() map[string]interface{} {
+	if c == nil {
+		return map[string]interface{}{
+			"connected": false,
+			"status":    "not_configured",
+		}
+	}
+	return map[string]interface{}{
+		"connected":    c.status == "healthy",
+		"status":       c.status,
+		"host":         c.config.Host,
+		"port":         c.config.Port,
+		"tls":          c.config.TLSEnabled,
+		"password_set": c.config.Password != "",
+	}
 }
 
 // Ping checks if Redis is reachable.

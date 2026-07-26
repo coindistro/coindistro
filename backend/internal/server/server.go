@@ -85,6 +85,13 @@ func New(cfg *config.Config) (*Server, error) {
 		log.Info("database not configured, running without database")
 	}
 
+	log.Info("Redis environment variables",
+		zap.String("COINDISTRO_REDIS_URL", envStatus(os.Getenv("COINDISTRO_REDIS_URL"))),
+		zap.String("COINDISTRO_REDIS_HOST", envStatus(os.Getenv("COINDISTRO_REDIS_HOST"))),
+		zap.String("COINDISTRO_REDIS_PORT", envStatus(os.Getenv("COINDISTRO_REDIS_PORT"))),
+		zap.String("COINDISTRO_REDIS_PASSWORD", envStatus(os.Getenv("COINDISTRO_REDIS_PASSWORD"))),
+	)
+
 	// Initialize Redis
 	var redis *cache.Cache
 	if cfg.Redis.IsConfigured() {
@@ -252,6 +259,13 @@ func New(cfg *config.Config) (*Server, error) {
 		engine:       engine,
 		http:         httpServer,
 	}, nil
+}
+
+func envStatus(value string) string {
+	if value == "" {
+		return "missing"
+	}
+	return "present"
 }
 
 // Start starts the HTTP server and all background services.

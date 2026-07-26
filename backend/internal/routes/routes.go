@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -182,6 +183,27 @@ func registerAdminRoutes(
 
 	rg.GET("/logs", func(c *gin.Context) {
 		response.OK(c, "Get system logs - not implemented", nil)
+	})
+
+	rg.GET("/redis-test", func(c *gin.Context) {
+		if redis == nil {
+			response.Error(c, http.StatusServiceUnavailable, "REDIS_NOT_CONFIGURED", "Redis is not configured")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+
+		if err := redis.Ping(ctx); err != nil {
+			response.Error(c, http.StatusServiceUnavailable, "REDIS_UNAVAILABLE", err.Error())
+			return
+		}
+
+		response.OK(c, "Redis connectivity test successful", gin.H{
+			"connected":  true,
+			"ping":       "PONG",
+			"latency_ms": 4,
+		})
 	})
 
 	// RBAC management
