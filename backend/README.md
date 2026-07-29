@@ -172,7 +172,7 @@ The server will start at `http://localhost:8080`.
 | GET | `/ready` | Readiness probe |
 | GET | `/live` | Liveness probe |
 | GET | `/metrics` | Prometheus metrics |
-| GET | `/swagger/*any` | Swagger documentation |
+| GET | `/swagger/*any` | Swagger UI (host/schemes set at runtime; production → `https://coindistro.onrender.com/api/v1`) |
 
 ### API v1
 

@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/activity": {
+        "/activity": {
             "get": {
                 "security": [
                     {
@@ -42,7 +42,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -50,7 +50,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.ActivityLogResponse"
+                                                "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.ActivityLogResponse"
                                             }
                                         }
                                     }
@@ -61,171 +61,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/admin/users": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get paginated list of all users",
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "List all users (Admin)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by status",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Items per page",
-                        "name": "per_page",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/users/{id}/credits": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update a user's invitation credit balance",
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Update invitation credits (Admin)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Credits",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateInvitationCreditsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/users/{id}/roles": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update a user's role assignments",
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Update user roles (Admin)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "New roles",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateRolesRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/users/{id}/status": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update a user's account status (active, suspended, banned)",
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Update user status (Admin)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "New status",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateUserStatusRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/auth/change-password": {
+        "/auth/change-password": {
             "put": {
                 "security": [
                     {
@@ -250,7 +86,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.ChangePasswordRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.ChangePasswordRequest"
                         }
                     }
                 ],
@@ -258,13 +94,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/forgot-password": {
+        "/auth/forgot-password": {
             "post": {
                 "description": "Send a password reset link to your email",
                 "consumes": [
@@ -284,7 +120,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.PasswordResetRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.PasswordResetRequest"
                         }
                     }
                 ],
@@ -292,13 +128,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/login": {
+        "/auth/login": {
             "post": {
                 "description": "Authenticate with email and password",
                 "consumes": [
@@ -318,7 +154,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.LoginRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.LoginRequest"
                         }
                     }
                 ],
@@ -328,13 +164,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.AuthResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse"
                                         }
                                     }
                                 }
@@ -344,13 +180,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/logout": {
+        "/auth/logout": {
             "post": {
                 "security": [
                     {
@@ -366,13 +202,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/refresh": {
+        "/auth/refresh": {
             "post": {
                 "description": "Get a new access token using a refresh token",
                 "consumes": [
@@ -392,7 +228,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.RefreshTokenRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.RefreshTokenRequest"
                         }
                     }
                 ],
@@ -402,13 +238,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.AuthResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse"
                                         }
                                     }
                                 }
@@ -418,13 +254,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/register": {
+        "/auth/register": {
             "post": {
                 "description": "Register with referral code. Invite-only when enabled.",
                 "consumes": [
@@ -444,7 +280,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.RegisterRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.RegisterRequest"
                         }
                     }
                 ],
@@ -454,13 +290,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.AuthResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse"
                                         }
                                     }
                                 }
@@ -470,25 +306,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/resend-verification": {
+        "/auth/resend-verification": {
             "post": {
                 "security": [
                     {
@@ -504,13 +340,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/reset-password": {
+        "/auth/reset-password": {
             "post": {
                 "description": "Complete password reset with token and new password",
                 "consumes": [
@@ -530,7 +366,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.PasswordResetComplete"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.PasswordResetComplete"
                         }
                     }
                 ],
@@ -538,13 +374,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/auth/verify-email": {
+        "/auth/verify-email": {
             "get": {
                 "description": "Verify email using the token sent to your email",
                 "tags": [
@@ -564,19 +400,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/devices": {
+        "/devices": {
             "get": {
                 "security": [
                     {
@@ -594,7 +430,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -602,7 +438,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.DeviceResponse"
+                                                "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.DeviceResponse"
                                             }
                                         }
                                     }
@@ -613,7 +449,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/devices/{id}": {
+        "/devices/{id}": {
             "delete": {
                 "security": [
                     {
@@ -638,13 +474,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/launchpool": {
+        "/earn/admin/launchpool": {
             "post": {
                 "security": [
                     {
@@ -668,7 +504,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.CreateLaunchpoolRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.CreateLaunchpoolRequest"
                         }
                     }
                 ],
@@ -676,13 +512,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/learn": {
+        "/earn/admin/learn": {
             "post": {
                 "security": [
                     {
@@ -706,7 +542,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.CreateLearnCampaignRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.CreateLearnCampaignRequest"
                         }
                     }
                 ],
@@ -714,13 +550,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/products": {
+        "/earn/admin/products": {
             "get": {
                 "security": [
                     {
@@ -738,7 +574,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
@@ -766,7 +602,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.CreateProductRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.CreateProductRequest"
                         }
                     }
                 ],
@@ -774,13 +610,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/products/{id}": {
+        "/earn/admin/products/{id}": {
             "put": {
                 "security": [
                     {
@@ -811,7 +647,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UpdateProductRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.UpdateProductRequest"
                         }
                     }
                 ],
@@ -819,13 +655,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/products/{id}/analytics": {
+        "/earn/admin/products/{id}/analytics": {
             "get": {
                 "security": [
                     {
@@ -854,13 +690,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.ProductAnalytics"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.ProductAnalytics"
                                         }
                                     }
                                 }
@@ -870,7 +706,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/earn/admin/products/{id}/participants": {
+        "/earn/admin/products/{id}/participants": {
             "get": {
                 "security": [
                     {
@@ -897,13 +733,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/admin/products/{id}/status": {
+        "/earn/admin/products/{id}/status": {
             "put": {
                 "security": [
                     {
@@ -942,13 +778,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/history": {
+        "/earn/history": {
             "get": {
                 "security": [
                     {
@@ -966,13 +802,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/launchpool": {
+        "/earn/launchpool": {
             "get": {
                 "produces": [
                     "application/json"
@@ -985,13 +821,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/learn": {
+        "/earn/learn": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1004,13 +840,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/learn/{id}/complete": {
+        "/earn/learn/{id}/complete": {
             "post": {
                 "security": [
                     {
@@ -1040,7 +876,7 @@ const docTemplate = `{
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/models.CompleteLearnRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.CompleteLearnRequest"
                         }
                     }
                 ],
@@ -1048,13 +884,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/participations": {
+        "/earn/participations": {
             "get": {
                 "security": [
                     {
@@ -1080,13 +916,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/participations/{id}": {
+        "/earn/participations/{id}": {
             "get": {
                 "security": [
                     {
@@ -1113,13 +949,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/participations/{id}/add-funds": {
+        "/earn/participations/{id}/add-funds": {
             "post": {
                 "security": [
                     {
@@ -1150,7 +986,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.AddFundsRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.AddFundsRequest"
                         }
                     }
                 ],
@@ -1158,13 +994,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/participations/{id}/exit": {
+        "/earn/participations/{id}/exit": {
             "post": {
                 "security": [
                     {
@@ -1194,7 +1030,7 @@ const docTemplate = `{
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/models.ExitParticipationRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.ExitParticipationRequest"
                         }
                     }
                 ],
@@ -1202,13 +1038,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/participations/{id}/withdraw": {
+        "/earn/participations/{id}/withdraw": {
             "post": {
                 "security": [
                     {
@@ -1239,7 +1075,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.WithdrawRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.WithdrawRequest"
                         }
                     }
                 ],
@@ -1247,13 +1083,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/portfolio": {
+        "/earn/portfolio": {
             "get": {
                 "security": [
                     {
@@ -1273,13 +1109,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.PortfolioOverview"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.PortfolioOverview"
                                         }
                                     }
                                 }
@@ -1289,7 +1125,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/earn/products": {
+        "/earn/products": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1340,13 +1176,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/products/{id}": {
+        "/earn/products/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1368,13 +1204,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/products/{id}/join": {
+        "/earn/products/{id}/join": {
             "post": {
                 "security": [
                     {
@@ -1405,7 +1241,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.JoinProductRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.JoinProductRequest"
                         }
                     }
                 ],
@@ -1413,13 +1249,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/earn/referral/rewards": {
+        "/earn/referral/rewards": {
             "get": {
                 "security": [
                     {
@@ -1439,13 +1275,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.ReferralRewardSummary"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralRewardSummary"
                                         }
                                     }
                                 }
@@ -1455,7 +1291,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/earn/rewards": {
+        "/earn/rewards": {
             "get": {
                 "security": [
                     {
@@ -1473,13 +1309,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/invitations": {
+        "/invitations": {
             "get": {
                 "security": [
                     {
@@ -1497,7 +1333,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1505,7 +1341,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.InvitationResponse"
+                                                "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.InvitationResponse"
                                             }
                                         }
                                     }
@@ -1539,7 +1375,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.SendInvitationRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.SendInvitationRequest"
                         }
                     }
                 ],
@@ -1549,13 +1385,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.InvitationResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.InvitationResponse"
                                         }
                                     }
                                 }
@@ -1565,7 +1401,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/referrals/dashboard": {
+        "/referrals/dashboard": {
             "get": {
                 "security": [
                     {
@@ -1583,13 +1419,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.ReferralDashboardResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralDashboardResponse"
                                         }
                                     }
                                 }
@@ -1599,7 +1435,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/sessions": {
+        "/sessions": {
             "get": {
                 "security": [
                     {
@@ -1617,7 +1453,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1625,7 +1461,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.SessionResponse"
+                                                "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.SessionResponse"
                                             }
                                         }
                                     }
@@ -1636,7 +1472,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/sessions/terminate-all": {
+        "/sessions/terminate-all": {
             "post": {
                 "security": [
                     {
@@ -1652,13 +1488,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/sessions/{id}": {
+        "/sessions/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1683,13 +1519,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users/check-email": {
+        "/users/check-email": {
             "get": {
                 "description": "Check if an email is already registered",
                 "tags": [
@@ -1709,13 +1545,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users/check-username": {
+        "/users/check-username": {
             "get": {
                 "description": "Check if a username is already taken",
                 "tags": [
@@ -1735,13 +1571,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.APIResponse"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users/me": {
+        "/users/me": {
             "get": {
                 "security": [
                     {
@@ -1759,13 +1595,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse"
                                         }
                                     }
                                 }
@@ -1798,7 +1634,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UpdateProfileRequest"
+                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.UpdateProfileRequest"
                         }
                     }
                 ],
@@ -1808,13 +1644,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/response.APIResponse"
+                                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
+                                            "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse"
                                         }
                                     }
                                 }
@@ -1826,31 +1662,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.ActivityLogResponse": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "details": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "device_id": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "ip_address": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.AddFundsRequest": {
+        "github_com_coindistro_backend_internal_earn_models.AddFundsRequest": {
             "type": "object",
             "required": [
                 "amount"
@@ -1861,43 +1673,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.AuthResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "expires_in": {
-                    "type": "integer"
-                },
-                "refresh_token": {
-                    "type": "string"
-                },
-                "token_type": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/models.UserResponse"
-                }
-            }
-        },
-        "models.ChangePasswordRequest": {
-            "type": "object",
-            "required": [
-                "current_password",
-                "new_password"
-            ],
-            "properties": {
-                "current_password": {
-                    "type": "string"
-                },
-                "new_password": {
-                    "type": "string",
-                    "minLength": 8
-                }
-            }
-        },
-        "models.CompleteLearnRequest": {
+        "github_com_coindistro_backend_internal_earn_models.CompleteLearnRequest": {
             "type": "object",
             "properties": {
                 "metadata": {
@@ -1907,7 +1683,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CreateLaunchpoolRequest": {
+        "github_com_coindistro_backend_internal_earn_models.CreateLaunchpoolRequest": {
             "type": "object",
             "required": [
                 "name",
@@ -1951,7 +1727,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CreateLearnCampaignRequest": {
+        "github_com_coindistro_backend_internal_earn_models.CreateLearnCampaignRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -1986,7 +1762,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CreateProductRequest": {
+        "github_com_coindistro_backend_internal_earn_models.CreateProductRequest": {
             "type": "object",
             "required": [
                 "category",
@@ -2071,39 +1847,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.DeviceResponse": {
-            "type": "object",
-            "properties": {
-                "browser": {
-                    "type": "string"
-                },
-                "device_type": {
-                    "type": "string"
-                },
-                "first_seen_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_current": {
-                    "type": "boolean"
-                },
-                "is_trusted": {
-                    "type": "boolean"
-                },
-                "last_seen_at": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "operating_system": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.ExitParticipationRequest": {
+        "github_com_coindistro_backend_internal_earn_models.ExitParticipationRequest": {
             "type": "object",
             "properties": {
                 "reason": {
@@ -2111,36 +1855,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.InvitationResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "consumed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "invitee_email": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.JoinProductRequest": {
+        "github_com_coindistro_backend_internal_earn_models.JoinProductRequest": {
             "type": "object",
             "required": [
                 "amount",
@@ -2158,49 +1873,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LoginRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.PasswordResetComplete": {
-            "type": "object",
-            "required": [
-                "password",
-                "token"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.PasswordResetRequest": {
-            "type": "object",
-            "required": [
-                "email"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.PortfolioOverview": {
+        "github_com_coindistro_backend_internal_earn_models.PortfolioOverview": {
             "type": "object",
             "properties": {
                 "active_products": {
@@ -2241,7 +1914,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ProductAnalytics": {
+        "github_com_coindistro_backend_internal_earn_models.ProductAnalytics": {
             "type": "object",
             "properties": {
                 "avg_allocation": {
@@ -2270,45 +1943,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ReferralDashboardResponse": {
-            "type": "object",
-            "properties": {
-                "conversion_rate": {
-                    "type": "number"
-                },
-                "invitation_credits": {
-                    "type": "integer"
-                },
-                "leaderboard_rank": {
-                    "type": "integer"
-                },
-                "pending_invites": {
-                    "type": "integer"
-                },
-                "referral_code": {
-                    "type": "string"
-                },
-                "referral_link": {
-                    "type": "string"
-                },
-                "referral_tree": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.ReferralNode"
-                    }
-                },
-                "rewards_earned": {
-                    "type": "number"
-                },
-                "successful_invites": {
-                    "type": "integer"
-                },
-                "total_invites": {
-                    "type": "integer"
-                }
-            }
-        },
-        "models.ReferralMilestone": {
+        "github_com_coindistro_backend_internal_earn_models.ReferralMilestone": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -2344,30 +1979,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ReferralNode": {
-            "type": "object",
-            "properties": {
-                "children": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.ReferralNode"
-                    }
-                },
-                "date": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "level": {
-                    "type": "integer"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.ReferralRewardClaim": {
+        "github_com_coindistro_backend_internal_earn_models.ReferralRewardClaim": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -2400,19 +2012,19 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ReferralRewardSummary": {
+        "github_com_coindistro_backend_internal_earn_models.ReferralRewardSummary": {
             "type": "object",
             "properties": {
                 "claims": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ReferralRewardClaim"
+                        "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralRewardClaim"
                     }
                 },
                 "milestones": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ReferralMilestone"
+                        "$ref": "#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralMilestone"
                     }
                 },
                 "total_eligible": {
@@ -2423,121 +2035,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.RefreshTokenRequest": {
-            "type": "object",
-            "required": [
-                "refresh_token"
-            ],
-            "properties": {
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.RegisterRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "referral_code"
-            ],
-            "properties": {
-                "country": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string",
-                    "maxLength": 100
-                },
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
-                "referral_code": {
-                    "type": "string"
-                },
-                "timezone": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 3
-                }
-            }
-        },
-        "models.SendInvitationRequest": {
-            "type": "object",
-            "required": [
-                "email"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.SessionResponse": {
-            "type": "object",
-            "properties": {
-                "browser": {
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
-                },
-                "device_name": {
-                    "type": "string"
-                },
-                "device_type": {
-                    "type": "string"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "ip_address": {
-                    "type": "string"
-                },
-                "is_current": {
-                    "type": "boolean"
-                },
-                "last_activity_at": {
-                    "type": "string"
-                },
-                "login_at": {
-                    "type": "string"
-                },
-                "operating_system": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.UpdateInvitationCreditsRequest": {
-            "type": "object",
-            "required": [
-                "credits"
-            ],
-            "properties": {
-                "credits": {
-                    "type": "integer",
-                    "minimum": 0
-                }
-            }
-        },
-        "models.UpdateProductRequest": {
+        "github_com_coindistro_backend_internal_earn_models.UpdateProductRequest": {
             "type": "object",
             "properties": {
                 "capacity_total": {
@@ -2605,7 +2103,344 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UpdateProfileRequest": {
+        "github_com_coindistro_backend_internal_earn_models.WithdrawRequest": {
+            "type": "object",
+            "required": [
+                "amount"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.ActivityLogResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "device_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "current_password",
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string"
+                },
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.DeviceResponse": {
+            "type": "object",
+            "properties": {
+                "browser": {
+                    "type": "string"
+                },
+                "device_type": {
+                    "type": "string"
+                },
+                "first_seen_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "is_trusted": {
+                    "type": "boolean"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operating_system": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.InvitationResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "consumed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invitee_email": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.PasswordResetComplete": {
+            "type": "object",
+            "required": [
+                "password",
+                "token"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.PasswordResetRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.ReferralDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "conversion_rate": {
+                    "type": "number"
+                },
+                "invitation_credits": {
+                    "type": "integer"
+                },
+                "leaderboard_rank": {
+                    "type": "integer"
+                },
+                "pending_invites": {
+                    "type": "integer"
+                },
+                "referral_code": {
+                    "type": "string"
+                },
+                "referral_link": {
+                    "type": "string"
+                },
+                "referral_tree": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralNode"
+                    }
+                },
+                "rewards_earned": {
+                    "type": "number"
+                },
+                "successful_invites": {
+                    "type": "integer"
+                },
+                "total_invites": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.ReferralNode": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralNode"
+                    }
+                },
+                "date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.RefreshTokenRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "referral_code"
+            ],
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "referral_code": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.SendInvitationRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "browser": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "device_type": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "last_activity_at": {
+                    "type": "string"
+                },
+                "login_at": {
+                    "type": "string"
+                },
+                "operating_system": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_coindistro_backend_internal_identity_models.UpdateProfileRequest": {
             "type": "object",
             "properties": {
                 "avatar_url": {
@@ -2628,33 +2463,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UpdateRolesRequest": {
-            "type": "object",
-            "required": [
-                "roles"
-            ],
-            "properties": {
-                "roles": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "models.UpdateUserStatusRequest": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.UserResponse": {
+        "github_com_coindistro_backend_internal_identity_models.UserResponse": {
             "type": "object",
             "properties": {
                 "avatar_url": {
@@ -2713,18 +2522,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.WithdrawRequest": {
-            "type": "object",
-            "required": [
-                "amount"
-            ],
-            "properties": {
-                "amount": {
-                    "type": "number"
-                }
-            }
-        },
-        "response.APIError": {
+        "github_com_coindistro_backend_internal_response.APIError": {
             "type": "object",
             "properties": {
                 "code": {
@@ -2736,25 +2534,25 @@ const docTemplate = `{
                 }
             }
         },
-        "response.APIResponse": {
+        "github_com_coindistro_backend_internal_response.APIResponse": {
             "type": "object",
             "properties": {
                 "data": {},
                 "error": {
-                    "$ref": "#/definitions/response.APIError"
+                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.APIError"
                 },
                 "message": {
                     "type": "string"
                 },
                 "meta": {
-                    "$ref": "#/definitions/response.Meta"
+                    "$ref": "#/definitions/github_com_coindistro_backend_internal_response.Meta"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "response.Meta": {
+        "github_com_coindistro_backend_internal_response.Meta": {
             "type": "object",
             "properties": {
                 "page": {
@@ -2788,9 +2586,9 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0.0",
-	Host:             "localhost:8080",
+	Host:             "coindistro.onrender.com",
 	BasePath:         "/api/v1",
-	Schemes:          []string{},
+	Schemes:          []string{"https"},
 	Title:            "Coindistro API",
 	Description:      "Coindistro — One Platform. Everything Crypto. API backend for Africa's next-generation crypto financial ecosystem.",
 	InfoInstanceName: "swagger",

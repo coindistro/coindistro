@@ -22,8 +22,10 @@ import (
 // @license.name  MIT
 // @license.url   https://opensource.org/licenses/MIT
 
-// @host      localhost:8080
+// Host/schemes are overridden at runtime by server.ConfigureSwagger (production → Render HTTPS).
+// @host      coindistro.onrender.com
 // @BasePath  /api/v1
+// @schemes   https
 
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -41,6 +43,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Swagger host/schemes are environment-aware (production → Render HTTPS).
+	// BasePath is always /api/v1; route annotations are relative (no /api/v1 prefix).
+	server.ConfigureSwagger(cfg)
 
 	// Create and start server
 	srv, err := server.New(cfg)

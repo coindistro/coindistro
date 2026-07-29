@@ -31,7 +31,7 @@ func New(svc *service.Service, logger *zap.Logger) *Handlers {
 // @Failure 400 {object} response.APIResponse
 // @Failure 403 {object} response.APIResponse
 // @Failure 409 {object} response.APIResponse
-// @Router /api/v1/auth/register [post]
+// @Router /auth/register [post]
 func (h *Handlers) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -60,7 +60,7 @@ func (h *Handlers) Register(c *gin.Context) {
 // @Param body body models.LoginRequest true "Login credentials"
 // @Success 200 {object} response.APIResponse{data=models.AuthResponse}
 // @Failure 401 {object} response.APIResponse
-// @Router /api/v1/auth/login [post]
+// @Router /auth/login [post]
 func (h *Handlers) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -108,7 +108,7 @@ func (h *Handlers) Login(c *gin.Context) {
 // @Param body body models.RefreshTokenRequest true "Refresh token"
 // @Success 200 {object} response.APIResponse{data=models.AuthResponse}
 // @Failure 401 {object} response.APIResponse
-// @Router /api/v1/auth/refresh [post]
+// @Router /auth/refresh [post]
 func (h *Handlers) RefreshToken(c *gin.Context) {
 	var req models.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -131,7 +131,7 @@ func (h *Handlers) RefreshToken(c *gin.Context) {
 // @Tags Authentication
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/auth/logout [post]
+// @Router /auth/logout [post]
 func (h *Handlers) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -150,7 +150,7 @@ func (h *Handlers) Logout(c *gin.Context) {
 // @Tags Users
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=models.UserResponse}
-// @Router /api/v1/users/me [get]
+// @Router /users/me [get]
 func (h *Handlers) GetProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -172,7 +172,7 @@ func (h *Handlers) GetProfile(c *gin.Context) {
 // @Produce json
 // @Param body body models.UpdateProfileRequest true "Profile fields"
 // @Success 200 {object} response.APIResponse{data=models.UserResponse}
-// @Router /api/v1/users/me [put]
+// @Router /users/me [put]
 func (h *Handlers) UpdateProfile(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -198,7 +198,7 @@ func (h *Handlers) UpdateProfile(c *gin.Context) {
 // @Param token query string true "Verification token"
 // @Success 200 {object} response.APIResponse
 // @Failure 400 {object} response.APIResponse
-// @Router /api/v1/auth/verify-email [get]
+// @Router /auth/verify-email [get]
 func (h *Handlers) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -221,7 +221,7 @@ func (h *Handlers) VerifyEmail(c *gin.Context) {
 // @Tags Authentication
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/auth/resend-verification [post]
+// @Router /auth/resend-verification [post]
 func (h *Handlers) ResendVerification(c *gin.Context) {
 	userID := c.GetString("user_id")
 	email := c.GetString("email")
@@ -243,7 +243,7 @@ func (h *Handlers) ResendVerification(c *gin.Context) {
 // @Produce json
 // @Param body body models.PasswordResetRequest true "Email address"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/auth/forgot-password [post]
+// @Router /auth/forgot-password [post]
 func (h *Handlers) RequestPasswordReset(c *gin.Context) {
 	var req models.PasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -268,7 +268,7 @@ func (h *Handlers) RequestPasswordReset(c *gin.Context) {
 // @Produce json
 // @Param body body models.PasswordResetComplete true "Reset token and new password"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/auth/reset-password [post]
+// @Router /auth/reset-password [post]
 func (h *Handlers) ResetPassword(c *gin.Context) {
 	var req models.PasswordResetComplete
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -294,7 +294,7 @@ func (h *Handlers) ResetPassword(c *gin.Context) {
 // @Produce json
 // @Param body body models.ChangePasswordRequest true "Current and new password"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/auth/change-password [put]
+// @Router /auth/change-password [put]
 func (h *Handlers) ChangePassword(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -319,7 +319,7 @@ func (h *Handlers) ChangePassword(c *gin.Context) {
 // @Tags Sessions
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=[]models.SessionResponse}
-// @Router /api/v1/sessions [get]
+// @Router /sessions [get]
 func (h *Handlers) GetSessions(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -339,7 +339,7 @@ func (h *Handlers) GetSessions(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Session ID"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/sessions/{id} [delete]
+// @Router /sessions/{id} [delete]
 func (h *Handlers) TerminateSession(c *gin.Context) {
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
@@ -359,7 +359,7 @@ func (h *Handlers) TerminateSession(c *gin.Context) {
 // @Tags Sessions
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/sessions/terminate-all [post]
+// @Router /sessions/terminate-all [post]
 func (h *Handlers) TerminateAllSessions(c *gin.Context) {
 	userID := c.GetString("user_id")
 	currentSessionID := c.GetString("session_id")
@@ -379,7 +379,7 @@ func (h *Handlers) TerminateAllSessions(c *gin.Context) {
 // @Tags Devices
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=[]models.DeviceResponse}
-// @Router /api/v1/devices [get]
+// @Router /devices [get]
 func (h *Handlers) GetDevices(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -399,7 +399,7 @@ func (h *Handlers) GetDevices(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Device ID"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/devices/{id} [delete]
+// @Router /devices/{id} [delete]
 func (h *Handlers) RemoveDevice(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceID := c.Param("id")
@@ -419,7 +419,7 @@ func (h *Handlers) RemoveDevice(c *gin.Context) {
 // @Tags Referrals
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=models.ReferralDashboardResponse}
-// @Router /api/v1/referrals/dashboard [get]
+// @Router /referrals/dashboard [get]
 func (h *Handlers) GetReferralDashboard(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -438,7 +438,7 @@ func (h *Handlers) GetReferralDashboard(c *gin.Context) {
 // @Tags Invitations
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=[]models.InvitationResponse}
-// @Router /api/v1/invitations [get]
+// @Router /invitations [get]
 func (h *Handlers) GetInvitations(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -460,7 +460,7 @@ func (h *Handlers) GetInvitations(c *gin.Context) {
 // @Produce json
 // @Param body body models.SendInvitationRequest true "Invitation details"
 // @Success 201 {object} response.APIResponse{data=models.InvitationResponse}
-// @Router /api/v1/invitations [post]
+// @Router /invitations [post]
 func (h *Handlers) SendInvitation(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -485,7 +485,7 @@ func (h *Handlers) SendInvitation(c *gin.Context) {
 // @Tags Security
 // @Security BearerAuth
 // @Success 200 {object} response.APIResponse{data=[]models.ActivityLogResponse}
-// @Router /api/v1/activity [get]
+// @Router /activity [get]
 func (h *Handlers) GetActivityLog(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -504,7 +504,7 @@ func (h *Handlers) GetActivityLog(c *gin.Context) {
 // @Tags Users
 // @Param email query string true "Email to check"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/users/check-email [get]
+// @Router /users/check-email [get]
 func (h *Handlers) CheckEmailAvailability(c *gin.Context) {
 	email := c.Query("email")
 	if email == "" {
@@ -527,7 +527,7 @@ func (h *Handlers) CheckEmailAvailability(c *gin.Context) {
 // @Tags Users
 // @Param username query string true "Username to check"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/users/check-username [get]
+// @Router /users/check-username [get]
 func (h *Handlers) CheckUsernameAvailability(c *gin.Context) {
 	username := c.Query("username")
 	if username == "" {

@@ -52,7 +52,7 @@ func pageParams(c *gin.Context) (int, int) {
 // @Param page query int false "Page"
 // @Param per_page query int false "Per page"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/products [get]
+// @Router /earn/products [get]
 func (h *Handlers) ListProducts(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -90,7 +90,7 @@ func (h *Handlers) ListProducts(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Product ID or slug"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/products/{id} [get]
+// @Router /earn/products/{id} [get]
 func (h *Handlers) GetProduct(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -111,7 +111,7 @@ func (h *Handlers) GetProduct(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.APIResponse{data=models.PortfolioOverview}
-// @Router /api/v1/earn/portfolio [get]
+// @Router /earn/portfolio [get]
 func (h *Handlers) PortfolioOverview(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -135,7 +135,7 @@ func (h *Handlers) PortfolioOverview(c *gin.Context) {
 // @Param id path string true "Product ID"
 // @Param body body models.JoinProductRequest true "Join request"
 // @Success 201 {object} response.APIResponse
-// @Router /api/v1/earn/products/{id}/join [post]
+// @Router /earn/products/{id}/join [post]
 func (h *Handlers) JoinProduct(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -160,7 +160,7 @@ func (h *Handlers) JoinProduct(c *gin.Context) {
 // @Produce json
 // @Param status query string false "Status"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/participations [get]
+// @Router /earn/participations [get]
 func (h *Handlers) ListParticipations(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -183,7 +183,7 @@ func (h *Handlers) ListParticipations(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Participation ID"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/participations/{id} [get]
+// @Router /earn/participations/{id} [get]
 func (h *Handlers) GetParticipation(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -205,7 +205,7 @@ func (h *Handlers) GetParticipation(c *gin.Context) {
 // @Param id path string true "Participation ID"
 // @Param body body models.AddFundsRequest true "Amount"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/participations/{id}/add-funds [post]
+// @Router /earn/participations/{id}/add-funds [post]
 func (h *Handlers) AddFunds(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -232,7 +232,7 @@ func (h *Handlers) AddFunds(c *gin.Context) {
 // @Param id path string true "Participation ID"
 // @Param body body models.WithdrawRequest true "Amount"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/participations/{id}/withdraw [post]
+// @Router /earn/participations/{id}/withdraw [post]
 func (h *Handlers) Withdraw(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -259,7 +259,7 @@ func (h *Handlers) Withdraw(c *gin.Context) {
 // @Param id path string true "Participation ID"
 // @Param body body models.ExitParticipationRequest false "Reason"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/participations/{id}/exit [post]
+// @Router /earn/participations/{id}/exit [post]
 func (h *Handlers) ExitParticipation(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -282,7 +282,7 @@ func (h *Handlers) ExitParticipation(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/rewards [get]
+// @Router /earn/rewards [get]
 func (h *Handlers) ListRewards(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -304,7 +304,7 @@ func (h *Handlers) ListRewards(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/history [get]
+// @Router /earn/history [get]
 func (h *Handlers) ListTransactions(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -327,7 +327,7 @@ func (h *Handlers) ListTransactions(c *gin.Context) {
 // @Tags Earn
 // @Produce json
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/launchpool [get]
+// @Router /earn/launchpool [get]
 func (h *Handlers) ListLaunchpools(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -345,7 +345,7 @@ func (h *Handlers) ListLaunchpools(c *gin.Context) {
 // @Tags Earn
 // @Produce json
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/learn [get]
+// @Router /earn/learn [get]
 func (h *Handlers) ListLearnCampaigns(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -367,7 +367,7 @@ func (h *Handlers) ListLearnCampaigns(c *gin.Context) {
 // @Param id path string true "Campaign ID"
 // @Param body body models.CompleteLearnRequest false "Metadata"
 // @Success 201 {object} response.APIResponse
-// @Router /api/v1/earn/learn/{id}/complete [post]
+// @Router /earn/learn/{id}/complete [post]
 func (h *Handlers) CompleteLearnCampaign(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -388,7 +388,7 @@ func (h *Handlers) CompleteLearnCampaign(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.APIResponse{data=models.ReferralRewardSummary}
-// @Router /api/v1/earn/referral/rewards [get]
+// @Router /earn/referral/rewards [get]
 func (h *Handlers) ReferralRewards(c *gin.Context) {
 	if !h.requireEarnEnabled(c) {
 		return
@@ -411,7 +411,7 @@ func (h *Handlers) ReferralRewards(c *gin.Context) {
 // @Produce json
 // @Param body body models.CreateProductRequest true "Product"
 // @Success 201 {object} response.APIResponse
-// @Router /api/v1/earn/admin/products [post]
+// @Router /earn/admin/products [post]
 func (h *Handlers) AdminCreateProduct(c *gin.Context) {
 	var req models.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -435,7 +435,7 @@ func (h *Handlers) AdminCreateProduct(c *gin.Context) {
 // @Param id path string true "Product ID"
 // @Param body body models.UpdateProductRequest true "Updates"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/admin/products/{id} [put]
+// @Router /earn/admin/products/{id} [put]
 func (h *Handlers) AdminUpdateProduct(c *gin.Context) {
 	var req models.UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -459,7 +459,7 @@ func (h *Handlers) AdminUpdateProduct(c *gin.Context) {
 // @Param id path string true "Product ID"
 // @Param body body object true "Status payload" SchemaExample({"status":"paused"})
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/admin/products/{id}/status [put]
+// @Router /earn/admin/products/{id}/status [put]
 func (h *Handlers) AdminSetProductStatus(c *gin.Context) {
 	var req struct {
 		Status string `json:"status" binding:"required"`
@@ -483,7 +483,7 @@ func (h *Handlers) AdminSetProductStatus(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Product ID"
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/admin/products/{id}/participants [get]
+// @Router /earn/admin/products/{id}/participants [get]
 func (h *Handlers) AdminListParticipants(c *gin.Context) {
 	page, perPage := pageParams(c)
 	list, total, err := h.svc.ListParticipants(c.Request.Context(), c.Param("id"), page, perPage)
@@ -503,7 +503,7 @@ func (h *Handlers) AdminListParticipants(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Product ID"
 // @Success 200 {object} response.APIResponse{data=models.ProductAnalytics}
-// @Router /api/v1/earn/admin/products/{id}/analytics [get]
+// @Router /earn/admin/products/{id}/analytics [get]
 func (h *Handlers) AdminProductAnalytics(c *gin.Context) {
 	a, err := h.svc.ProductAnalytics(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -521,7 +521,7 @@ func (h *Handlers) AdminProductAnalytics(c *gin.Context) {
 // @Produce json
 // @Param body body models.CreateLaunchpoolRequest true "Campaign"
 // @Success 201 {object} response.APIResponse
-// @Router /api/v1/earn/admin/launchpool [post]
+// @Router /earn/admin/launchpool [post]
 func (h *Handlers) AdminCreateLaunchpool(c *gin.Context) {
 	var req models.CreateLaunchpoolRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -544,7 +544,7 @@ func (h *Handlers) AdminCreateLaunchpool(c *gin.Context) {
 // @Produce json
 // @Param body body models.CreateLearnCampaignRequest true "Campaign"
 // @Success 201 {object} response.APIResponse
-// @Router /api/v1/earn/admin/learn [post]
+// @Router /earn/admin/learn [post]
 func (h *Handlers) AdminCreateLearnCampaign(c *gin.Context) {
 	var req models.CreateLearnCampaignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -565,7 +565,7 @@ func (h *Handlers) AdminCreateLearnCampaign(c *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} response.APIResponse
-// @Router /api/v1/earn/admin/products [get]
+// @Router /earn/admin/products [get]
 func (h *Handlers) AdminListProducts(c *gin.Context) {
 	page, perPage := pageParams(c)
 	list, total, err := h.svc.ListProducts(c.Request.Context(), models.ProductListFilter{

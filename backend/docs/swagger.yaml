@@ -1,60 +1,20 @@
 basePath: /api/v1
 definitions:
-  models.ActivityLogResponse:
-    properties:
-      action:
-        type: string
-      created_at:
-        type: string
-      details:
-        additionalProperties: true
-        type: object
-      device_id:
-        type: string
-      id:
-        type: string
-      ip_address:
-        type: string
-    type: object
-  models.AddFundsRequest:
+  github_com_coindistro_backend_internal_earn_models.AddFundsRequest:
     properties:
       amount:
         type: number
     required:
     - amount
     type: object
-  models.AuthResponse:
-    properties:
-      access_token:
-        type: string
-      expires_in:
-        type: integer
-      refresh_token:
-        type: string
-      token_type:
-        type: string
-      user:
-        $ref: '#/definitions/models.UserResponse'
-    type: object
-  models.ChangePasswordRequest:
-    properties:
-      current_password:
-        type: string
-      new_password:
-        minLength: 8
-        type: string
-    required:
-    - current_password
-    - new_password
-    type: object
-  models.CompleteLearnRequest:
+  github_com_coindistro_backend_internal_earn_models.CompleteLearnRequest:
     properties:
       metadata:
         additionalProperties: true
         description: Optional metadata from Academy client
         type: object
     type: object
-  models.CreateLaunchpoolRequest:
+  github_com_coindistro_backend_internal_earn_models.CreateLaunchpoolRequest:
     properties:
       allocation_rules:
         additionalProperties: true
@@ -85,7 +45,7 @@ definitions:
     - window_end
     - window_start
     type: object
-  models.CreateLearnCampaignRequest:
+  github_com_coindistro_backend_internal_earn_models.CreateLearnCampaignRequest:
     properties:
       academy_course_id:
         type: string
@@ -108,7 +68,7 @@ definitions:
     required:
     - name
     type: object
-  models.CreateProductRequest:
+  github_com_coindistro_backend_internal_earn_models.CreateProductRequest:
     properties:
       capacity_total:
         type: number
@@ -168,52 +128,12 @@ definitions:
     - slug
     - supported_assets
     type: object
-  models.DeviceResponse:
-    properties:
-      browser:
-        type: string
-      device_type:
-        type: string
-      first_seen_at:
-        type: string
-      id:
-        type: string
-      is_current:
-        type: boolean
-      is_trusted:
-        type: boolean
-      last_seen_at:
-        type: string
-      name:
-        type: string
-      operating_system:
-        type: string
-    type: object
-  models.ExitParticipationRequest:
+  github_com_coindistro_backend_internal_earn_models.ExitParticipationRequest:
     properties:
       reason:
         type: string
     type: object
-  models.InvitationResponse:
-    properties:
-      code:
-        type: string
-      consumed_at:
-        type: string
-      created_at:
-        type: string
-      expires_at:
-        type: string
-      id:
-        type: string
-      invitee_email:
-        type: string
-      message:
-        type: string
-      status:
-        type: string
-    type: object
-  models.JoinProductRequest:
+  github_com_coindistro_backend_internal_earn_models.JoinProductRequest:
     properties:
       amount:
         type: number
@@ -225,35 +145,7 @@ definitions:
     - amount
     - asset
     type: object
-  models.LoginRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    required:
-    - email
-    - password
-    type: object
-  models.PasswordResetComplete:
-    properties:
-      password:
-        minLength: 8
-        type: string
-      token:
-        type: string
-    required:
-    - password
-    - token
-    type: object
-  models.PasswordResetRequest:
-    properties:
-      email:
-        type: string
-    required:
-    - email
-    type: object
-  models.PortfolioOverview:
+  github_com_coindistro_backend_internal_earn_models.PortfolioOverview:
     properties:
       active_products:
         type: integer
@@ -281,7 +173,7 @@ definitions:
       total_assets_in_earn:
         type: number
     type: object
-  models.ProductAnalytics:
+  github_com_coindistro_backend_internal_earn_models.ProductAnalytics:
     properties:
       avg_allocation:
         type: number
@@ -300,32 +192,7 @@ definitions:
       total_rewards:
         type: number
     type: object
-  models.ReferralDashboardResponse:
-    properties:
-      conversion_rate:
-        type: number
-      invitation_credits:
-        type: integer
-      leaderboard_rank:
-        type: integer
-      pending_invites:
-        type: integer
-      referral_code:
-        type: string
-      referral_link:
-        type: string
-      referral_tree:
-        items:
-          $ref: '#/definitions/models.ReferralNode'
-        type: array
-      rewards_earned:
-        type: number
-      successful_invites:
-        type: integer
-      total_invites:
-        type: integer
-    type: object
-  models.ReferralMilestone:
+  github_com_coindistro_backend_internal_earn_models.ReferralMilestone:
     properties:
       created_at:
         type: string
@@ -349,22 +216,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  models.ReferralNode:
-    properties:
-      children:
-        items:
-          $ref: '#/definitions/models.ReferralNode'
-        type: array
-      date:
-        type: string
-      id:
-        type: string
-      level:
-        type: integer
-      username:
-        type: string
-    type: object
-  models.ReferralRewardClaim:
+  github_com_coindistro_backend_internal_earn_models.ReferralRewardClaim:
     properties:
       amount:
         type: number
@@ -386,99 +238,22 @@ definitions:
       user_id:
         type: string
     type: object
-  models.ReferralRewardSummary:
+  github_com_coindistro_backend_internal_earn_models.ReferralRewardSummary:
     properties:
       claims:
         items:
-          $ref: '#/definitions/models.ReferralRewardClaim'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralRewardClaim'
         type: array
       milestones:
         items:
-          $ref: '#/definitions/models.ReferralMilestone'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralMilestone'
         type: array
       total_eligible:
         type: number
       total_granted:
         type: number
     type: object
-  models.RefreshTokenRequest:
-    properties:
-      refresh_token:
-        type: string
-    required:
-    - refresh_token
-    type: object
-  models.RegisterRequest:
-    properties:
-      country:
-        type: string
-      display_name:
-        maxLength: 100
-        type: string
-      email:
-        type: string
-      password:
-        minLength: 8
-        type: string
-      referral_code:
-        type: string
-      timezone:
-        type: string
-      username:
-        maxLength: 50
-        minLength: 3
-        type: string
-    required:
-    - email
-    - password
-    - referral_code
-    type: object
-  models.SendInvitationRequest:
-    properties:
-      email:
-        type: string
-      message:
-        maxLength: 500
-        type: string
-      role:
-        type: string
-    required:
-    - email
-    type: object
-  models.SessionResponse:
-    properties:
-      browser:
-        type: string
-      country:
-        type: string
-      device_name:
-        type: string
-      device_type:
-        type: string
-      expires_at:
-        type: string
-      id:
-        type: string
-      ip_address:
-        type: string
-      is_current:
-        type: boolean
-      last_activity_at:
-        type: string
-      login_at:
-        type: string
-      operating_system:
-        type: string
-    type: object
-  models.UpdateInvitationCreditsRequest:
-    properties:
-      credits:
-        minimum: 0
-        type: integer
-    required:
-    - credits
-    type: object
-  models.UpdateProductRequest:
+  github_com_coindistro_backend_internal_earn_models.UpdateProductRequest:
     properties:
       capacity_total:
         type: number
@@ -524,7 +299,231 @@ definitions:
           type: string
         type: array
     type: object
-  models.UpdateProfileRequest:
+  github_com_coindistro_backend_internal_earn_models.WithdrawRequest:
+    properties:
+      amount:
+        type: number
+    required:
+    - amount
+    type: object
+  github_com_coindistro_backend_internal_identity_models.ActivityLogResponse:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      device_id:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+    type: object
+  github_com_coindistro_backend_internal_identity_models.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse'
+    type: object
+  github_com_coindistro_backend_internal_identity_models.ChangePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  github_com_coindistro_backend_internal_identity_models.DeviceResponse:
+    properties:
+      browser:
+        type: string
+      device_type:
+        type: string
+      first_seen_at:
+        type: string
+      id:
+        type: string
+      is_current:
+        type: boolean
+      is_trusted:
+        type: boolean
+      last_seen_at:
+        type: string
+      name:
+        type: string
+      operating_system:
+        type: string
+    type: object
+  github_com_coindistro_backend_internal_identity_models.InvitationResponse:
+    properties:
+      code:
+        type: string
+      consumed_at:
+        type: string
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      invitee_email:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_coindistro_backend_internal_identity_models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  github_com_coindistro_backend_internal_identity_models.PasswordResetComplete:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
+  github_com_coindistro_backend_internal_identity_models.PasswordResetRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  github_com_coindistro_backend_internal_identity_models.ReferralDashboardResponse:
+    properties:
+      conversion_rate:
+        type: number
+      invitation_credits:
+        type: integer
+      leaderboard_rank:
+        type: integer
+      pending_invites:
+        type: integer
+      referral_code:
+        type: string
+      referral_link:
+        type: string
+      referral_tree:
+        items:
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralNode'
+        type: array
+      rewards_earned:
+        type: number
+      successful_invites:
+        type: integer
+      total_invites:
+        type: integer
+    type: object
+  github_com_coindistro_backend_internal_identity_models.ReferralNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralNode'
+        type: array
+      date:
+        type: string
+      id:
+        type: string
+      level:
+        type: integer
+      username:
+        type: string
+    type: object
+  github_com_coindistro_backend_internal_identity_models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  github_com_coindistro_backend_internal_identity_models.RegisterRequest:
+    properties:
+      country:
+        type: string
+      display_name:
+        maxLength: 100
+        type: string
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      referral_code:
+        type: string
+      timezone:
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - referral_code
+    type: object
+  github_com_coindistro_backend_internal_identity_models.SendInvitationRequest:
+    properties:
+      email:
+        type: string
+      message:
+        maxLength: 500
+        type: string
+      role:
+        type: string
+    required:
+    - email
+    type: object
+  github_com_coindistro_backend_internal_identity_models.SessionResponse:
+    properties:
+      browser:
+        type: string
+      country:
+        type: string
+      device_name:
+        type: string
+      device_type:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      is_current:
+        type: boolean
+      last_activity_at:
+        type: string
+      login_at:
+        type: string
+      operating_system:
+        type: string
+    type: object
+  github_com_coindistro_backend_internal_identity_models.UpdateProfileRequest:
     properties:
       avatar_url:
         type: string
@@ -540,24 +539,7 @@ definitions:
         minLength: 3
         type: string
     type: object
-  models.UpdateRolesRequest:
-    properties:
-      roles:
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - roles
-    type: object
-  models.UpdateUserStatusRequest:
-    properties:
-      status:
-        type: string
-    required:
-    - status
-    type: object
-  models.UserResponse:
+  github_com_coindistro_backend_internal_identity_models.UserResponse:
     properties:
       avatar_url:
         type: string
@@ -596,14 +578,7 @@ definitions:
       username:
         type: string
     type: object
-  models.WithdrawRequest:
-    properties:
-      amount:
-        type: number
-    required:
-    - amount
-    type: object
-  response.APIError:
+  github_com_coindistro_backend_internal_response.APIError:
     properties:
       code:
         type: string
@@ -611,19 +586,19 @@ definitions:
       message:
         type: string
     type: object
-  response.APIResponse:
+  github_com_coindistro_backend_internal_response.APIResponse:
     properties:
       data: {}
       error:
-        $ref: '#/definitions/response.APIError'
+        $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIError'
       message:
         type: string
       meta:
-        $ref: '#/definitions/response.Meta'
+        $ref: '#/definitions/github_com_coindistro_backend_internal_response.Meta'
       success:
         type: boolean
     type: object
-  response.Meta:
+  github_com_coindistro_backend_internal_response.Meta:
     properties:
       page:
         type: integer
@@ -634,7 +609,7 @@ definitions:
       total_pages:
         type: integer
     type: object
-host: localhost:8080
+host: coindistro.onrender.com
 info:
   contact:
     email: support@coindistro.com
@@ -649,7 +624,7 @@ info:
   title: Coindistro API
   version: 1.0.0
 paths:
-  /api/v1/activity:
+  /activity:
     get:
       description: Get security and activity history for the current user
       responses:
@@ -657,11 +632,11 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/models.ActivityLogResponse'
+                    $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.ActivityLogResponse'
                   type: array
               type: object
       security:
@@ -669,110 +644,7 @@ paths:
       summary: Get activity log
       tags:
       - Security
-  /api/v1/admin/users:
-    get:
-      description: Get paginated list of all users
-      parameters:
-      - description: Filter by status
-        in: query
-        name: status
-        type: string
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: Items per page
-        in: query
-        name: per_page
-        type: integer
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: List all users (Admin)
-      tags:
-      - Admin
-  /api/v1/admin/users/{id}/credits:
-    put:
-      description: Update a user's invitation credit balance
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Credits
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateInvitationCreditsRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Update invitation credits (Admin)
-      tags:
-      - Admin
-  /api/v1/admin/users/{id}/roles:
-    put:
-      description: Update a user's role assignments
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: New roles
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateRolesRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Update user roles (Admin)
-      tags:
-      - Admin
-  /api/v1/admin/users/{id}/status:
-    put:
-      description: Update a user's account status (active, suspended, banned)
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: New status
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateUserStatusRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/response.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Update user status (Admin)
-      tags:
-      - Admin
-  /api/v1/auth/change-password:
+  /auth/change-password:
     put:
       consumes:
       - application/json
@@ -783,20 +655,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.ChangePasswordRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.ChangePasswordRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Change password
       tags:
       - Security
-  /api/v1/auth/forgot-password:
+  /auth/forgot-password:
     post:
       consumes:
       - application/json
@@ -807,18 +679,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.PasswordResetRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.PasswordResetRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Request password reset
       tags:
       - Authentication
-  /api/v1/auth/login:
+  /auth/login:
     post:
       consumes:
       - application/json
@@ -829,7 +701,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.LoginRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.LoginRequest'
       produces:
       - application/json
       responses:
@@ -837,32 +709,32 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.AuthResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse'
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Login to your account
       tags:
       - Authentication
-  /api/v1/auth/logout:
+  /auth/logout:
     post:
       description: Terminate the current session
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Logout
       tags:
       - Authentication
-  /api/v1/auth/refresh:
+  /auth/refresh:
     post:
       consumes:
       - application/json
@@ -873,7 +745,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.RefreshTokenRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.RefreshTokenRequest'
       produces:
       - application/json
       responses:
@@ -881,19 +753,19 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.AuthResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse'
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Refresh access token
       tags:
       - Authentication
-  /api/v1/auth/register:
+  /auth/register:
     post:
       consumes:
       - application/json
@@ -904,7 +776,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.RegisterRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.RegisterRequest'
       produces:
       - application/json
       responses:
@@ -912,40 +784,40 @@ paths:
           description: Created
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.AuthResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.AuthResponse'
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Register a new account
       tags:
       - Authentication
-  /api/v1/auth/resend-verification:
+  /auth/resend-verification:
     post:
       description: Resend the email verification link
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Resend verification email
       tags:
       - Authentication
-  /api/v1/auth/reset-password:
+  /auth/reset-password:
     post:
       consumes:
       - application/json
@@ -956,18 +828,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.PasswordResetComplete'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.PasswordResetComplete'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Reset password
       tags:
       - Authentication
-  /api/v1/auth/verify-email:
+  /auth/verify-email:
     get:
       description: Verify email using the token sent to your email
       parameters:
@@ -980,15 +852,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Verify email address
       tags:
       - Authentication
-  /api/v1/devices:
+  /devices:
     get:
       description: Get all trusted devices for the current user
       responses:
@@ -996,11 +868,11 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/models.DeviceResponse'
+                    $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.DeviceResponse'
                   type: array
               type: object
       security:
@@ -1008,7 +880,7 @@ paths:
       summary: List trusted devices
       tags:
       - Devices
-  /api/v1/devices/{id}:
+  /devices/{id}:
     delete:
       description: Remove a trusted device by ID
       parameters:
@@ -1021,13 +893,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Remove a device
       tags:
       - Devices
-  /api/v1/earn/admin/launchpool:
+  /earn/admin/launchpool:
     post:
       consumes:
       - application/json
@@ -1037,20 +909,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.CreateLaunchpoolRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.CreateLaunchpoolRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Create launchpool campaign (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/learn:
+  /earn/admin/learn:
     post:
       consumes:
       - application/json
@@ -1060,20 +932,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.CreateLearnCampaignRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.CreateLearnCampaignRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Create learn & earn campaign (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/products:
+  /earn/admin/products:
     get:
       produces:
       - application/json
@@ -1081,7 +953,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: List all products including drafts (admin)
@@ -1096,20 +968,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.CreateProductRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.CreateProductRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Create earn product (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/products/{id}:
+  /earn/admin/products/{id}:
     put:
       consumes:
       - application/json
@@ -1124,20 +996,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateProductRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.UpdateProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Update earn product (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/products/{id}/analytics:
+  /earn/admin/products/{id}/analytics:
     get:
       parameters:
       - description: Product ID
@@ -1152,17 +1024,17 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.ProductAnalytics'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.ProductAnalytics'
               type: object
       security:
       - BearerAuth: []
       summary: Product analytics (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/products/{id}/participants:
+  /earn/admin/products/{id}/participants:
     get:
       parameters:
       - description: Product ID
@@ -1176,13 +1048,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: List product participants (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/admin/products/{id}/status:
+  /earn/admin/products/{id}/status:
     put:
       consumes:
       - application/json
@@ -1204,13 +1076,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Pause/resume/archive product (admin)
       tags:
       - Earn Admin
-  /api/v1/earn/history:
+  /earn/history:
     get:
       produces:
       - application/json
@@ -1218,13 +1090,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: List earn transaction history
       tags:
       - Earn
-  /api/v1/earn/launchpool:
+  /earn/launchpool:
     get:
       produces:
       - application/json
@@ -1232,11 +1104,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: List launchpool campaigns
       tags:
       - Earn
-  /api/v1/earn/learn:
+  /earn/learn:
     get:
       produces:
       - application/json
@@ -1244,11 +1116,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: List learn & earn campaigns
       tags:
       - Earn
-  /api/v1/earn/learn/{id}/complete:
+  /earn/learn/{id}/complete:
     post:
       consumes:
       - application/json
@@ -1262,20 +1134,20 @@ paths:
         in: body
         name: body
         schema:
-          $ref: '#/definitions/models.CompleteLearnRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.CompleteLearnRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Record learning completion for reward eligibility
       tags:
       - Earn
-  /api/v1/earn/participations:
+  /earn/participations:
     get:
       parameters:
       - description: Status
@@ -1288,13 +1160,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: List user participations
       tags:
       - Earn
-  /api/v1/earn/participations/{id}:
+  /earn/participations/{id}:
     get:
       parameters:
       - description: Participation ID
@@ -1308,13 +1180,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Get participation details
       tags:
       - Earn
-  /api/v1/earn/participations/{id}/add-funds:
+  /earn/participations/{id}/add-funds:
     post:
       consumes:
       - application/json
@@ -1329,20 +1201,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.AddFundsRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.AddFundsRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Add funds to a participation
       tags:
       - Earn
-  /api/v1/earn/participations/{id}/exit:
+  /earn/participations/{id}/exit:
     post:
       consumes:
       - application/json
@@ -1356,20 +1228,20 @@ paths:
         in: body
         name: body
         schema:
-          $ref: '#/definitions/models.ExitParticipationRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.ExitParticipationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Exit a participation
       tags:
       - Earn
-  /api/v1/earn/participations/{id}/withdraw:
+  /earn/participations/{id}/withdraw:
     post:
       consumes:
       - application/json
@@ -1384,20 +1256,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.WithdrawRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.WithdrawRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Withdraw from a participation
       tags:
       - Earn
-  /api/v1/earn/portfolio:
+  /earn/portfolio:
     get:
       produces:
       - application/json
@@ -1406,17 +1278,17 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.PortfolioOverview'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.PortfolioOverview'
               type: object
       security:
       - BearerAuth: []
       summary: Earn portfolio overview
       tags:
       - Earn
-  /api/v1/earn/products:
+  /earn/products:
     get:
       parameters:
       - description: Product category
@@ -1449,11 +1321,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: List earn products
       tags:
       - Earn
-  /api/v1/earn/products/{id}:
+  /earn/products/{id}:
     get:
       parameters:
       - description: Product ID or slug
@@ -1467,11 +1339,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Get earn product by ID or slug
       tags:
       - Earn
-  /api/v1/earn/products/{id}/join:
+  /earn/products/{id}/join:
     post:
       consumes:
       - application/json
@@ -1486,20 +1358,20 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.JoinProductRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.JoinProductRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Join an earn product
       tags:
       - Earn
-  /api/v1/earn/referral/rewards:
+  /earn/referral/rewards:
     get:
       produces:
       - application/json
@@ -1508,17 +1380,17 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.ReferralRewardSummary'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_earn_models.ReferralRewardSummary'
               type: object
       security:
       - BearerAuth: []
       summary: Referral reward summary and history
       tags:
       - Earn
-  /api/v1/earn/rewards:
+  /earn/rewards:
     get:
       produces:
       - application/json
@@ -1526,13 +1398,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: List reward history
       tags:
       - Earn
-  /api/v1/invitations:
+  /invitations:
     get:
       description: Get all invitations sent by the current user
       responses:
@@ -1540,11 +1412,11 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/models.InvitationResponse'
+                    $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.InvitationResponse'
                   type: array
               type: object
       security:
@@ -1562,7 +1434,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.SendInvitationRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.SendInvitationRequest'
       produces:
       - application/json
       responses:
@@ -1570,17 +1442,17 @@ paths:
           description: Created
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.InvitationResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.InvitationResponse'
               type: object
       security:
       - BearerAuth: []
       summary: Send invitation
       tags:
       - Invitations
-  /api/v1/referrals/dashboard:
+  /referrals/dashboard:
     get:
       description: Get referral code, stats, and tree
       responses:
@@ -1588,17 +1460,17 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.ReferralDashboardResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.ReferralDashboardResponse'
               type: object
       security:
       - BearerAuth: []
       summary: Get referral dashboard
       tags:
       - Referrals
-  /api/v1/sessions:
+  /sessions:
     get:
       description: Get all active sessions for the current user
       responses:
@@ -1606,11 +1478,11 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/models.SessionResponse'
+                    $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.SessionResponse'
                   type: array
               type: object
       security:
@@ -1618,7 +1490,7 @@ paths:
       summary: List active sessions
       tags:
       - Sessions
-  /api/v1/sessions/{id}:
+  /sessions/{id}:
     delete:
       description: Terminate a specific session by ID
       parameters:
@@ -1631,26 +1503,26 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Terminate a session
       tags:
       - Sessions
-  /api/v1/sessions/terminate-all:
+  /sessions/terminate-all:
     post:
       description: Terminate all sessions except the current one
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       security:
       - BearerAuth: []
       summary: Terminate all sessions
       tags:
       - Sessions
-  /api/v1/users/check-email:
+  /users/check-email:
     get:
       description: Check if an email is already registered
       parameters:
@@ -1663,11 +1535,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Check email availability
       tags:
       - Users
-  /api/v1/users/check-username:
+  /users/check-username:
     get:
       description: Check if a username is already taken
       parameters:
@@ -1680,11 +1552,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.APIResponse'
+            $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
       summary: Check username availability
       tags:
       - Users
-  /api/v1/users/me:
+  /users/me:
     get:
       description: Returns the authenticated user's profile
       responses:
@@ -1692,10 +1564,10 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.UserResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse'
               type: object
       security:
       - BearerAuth: []
@@ -1712,7 +1584,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateProfileRequest'
+          $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.UpdateProfileRequest'
       produces:
       - application/json
       responses:
@@ -1720,16 +1592,18 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/response.APIResponse'
+            - $ref: '#/definitions/github_com_coindistro_backend_internal_response.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/models.UserResponse'
+                  $ref: '#/definitions/github_com_coindistro_backend_internal_identity_models.UserResponse'
               type: object
       security:
       - BearerAuth: []
       summary: Update current user profile
       tags:
       - Users
+schemes:
+- https
 securityDefinitions:
   BasicAuth:
     type: basic
