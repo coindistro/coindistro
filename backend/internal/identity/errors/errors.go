@@ -21,10 +21,12 @@ var (
 
 	// Authentication errors
 	ErrInvalidCredentials  = apperrors.New("INVALID_CREDENTIALS", "Invalid email or password", http.StatusUnauthorized)
-	ErrAccountLocked       = apperrors.New("ACCOUNT_LOCKED", "Account is temporarily locked due to too many failed attempts", http.StatusUnauthorized)
+	ErrUserNotFound        = apperrors.New("USER_NOT_FOUND", "User not found", http.StatusNotFound)
+	ErrAccountLocked       = apperrors.New("ACCOUNT_LOCKED", "Account is temporarily locked due to too many failed attempts", http.StatusLocked) // 423
 	ErrAccountNotVerified  = apperrors.New("ACCOUNT_NOT_VERIFIED", "Please verify your email before logging in", http.StatusForbidden)
 	ErrAccountSuspended    = apperrors.New("ACCOUNT_SUSPENDED", "Your account has been suspended", http.StatusForbidden)
 	ErrAccountBanned       = apperrors.New("ACCOUNT_BANNED", "Your account has been banned", http.StatusForbidden)
+	ErrAccountInactive     = apperrors.New("ACCOUNT_INACTIVE", "Your account is inactive", http.StatusForbidden)
 	ErrSessionExpired      = apperrors.New("SESSION_EXPIRED", "Your session has expired. Please log in again.", http.StatusUnauthorized)
 	ErrSessionRevoked      = apperrors.New("SESSION_REVOKED", "Your session has been revoked", http.StatusUnauthorized)
 	ErrInvalidRefreshToken = apperrors.New("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token", http.StatusUnauthorized)

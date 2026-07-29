@@ -23,12 +23,14 @@ import (
 	idservice "github.com/coindistro/backend/internal/identity/service"
 )
 
-// SuperAdminCredentials are the default Genesis Super Admin credentials (development only).
+// SuperAdminCredentials are the default Genesis Super Admin credentials.
+// Production can override password via COINDISTRO_SUPER_ADMIN_PASSWORD.
 const (
-	SuperAdminEmail    = "admin@coindistro.com"
-	SuperAdminPassword = "Admin@123456"
-	SuperAdminUsername = "emmanuel"
-	SuperAdminName     = "Emmanuel Ekanem"
+	SuperAdminEmail        = "admin@coindistro.com"
+	SuperAdminPassword     = "Admin@123456" // legacy dev default (seed CLI)
+	SuperAdminPasswordProd = "Admin123!"    // default production bootstrap password
+	SuperAdminUsername     = "emmanuel"
+	SuperAdminName         = "Emmanuel Ekanem"
 )
 
 // Result is the outcome of a bootstrap run.
@@ -70,12 +72,23 @@ func EnsureDevelopmentEnv(cfg *config.Config) error {
 	}
 }
 
-// Run performs first platform initialization: Genesis Super Admin only.
-// If a super_admin already exists, returns success without creating duplicates.
+// Run performs development-only CLI bootstrap (blocked outside development).
 func Run(ctx context.Context, deps Dependencies) (*Result, error) {
 	if err := EnsureDevelopmentEnv(deps.Config); err != nil {
 		return nil, err
 	}
+	return EnsureSuperAdmin(ctx, deps, SuperAdminPassword)
+}
+
+// EnsureSuperAdmin creates the platform super admin if one does not already exist.
+// Safe to call in every environment (including production) after migrations.
+// Idempotent: never creates duplicates.
+//
+// Password resolution order:
+//  1. COINDISTRO_SUPER_ADMIN_PASSWORD env
+//  2. passwordOverride argument (if non-empty)
+//  3. SuperAdminPasswordProd ("Admin123!")
+func EnsureSuperAdmin(ctx context.Context, deps Dependencies, passwordOverride string) (*Result, error) {
 	if deps.Identity == nil {
 		return nil, fmt.Errorf("identity service is required")
 	}
@@ -95,10 +108,21 @@ func Run(ctx context.Context, deps Dependencies) (*Result, error) {
 		return &Result{AlreadyCompleted: true, Message: msg}, nil
 	}
 
-	// Also treat existing admin@coindistro.com as completed bootstrap.
+	// Treat existing admin@coindistro.com as completed bootstrap.
 	if existing, _ := deps.Identity.GetProfileByEmail(ctx, SuperAdminEmail); existing != nil {
 		msg := "Bootstrap already completed."
+		if deps.Logger != nil {
+			deps.Logger.Info(msg, zap.String("email", SuperAdminEmail))
+		}
 		return &Result{AlreadyCompleted: true, Message: msg, User: existing}, nil
+	}
+
+	password := strings.TrimSpace(os.Getenv("COINDISTRO_SUPER_ADMIN_PASSWORD"))
+	if password == "" {
+		password = strings.TrimSpace(passwordOverride)
+	}
+	if password == "" {
+		password = SuperAdminPasswordProd
 	}
 
 	genesisN := 1
@@ -106,7 +130,7 @@ func Run(ctx context.Context, deps Dependencies) (*Result, error) {
 		Email:             SuperAdminEmail,
 		Username:          SuperAdminUsername,
 		DisplayName:       SuperAdminName,
-		Password:          SuperAdminPassword,
+		Password:          password,
 		Roles:             []string{"super_admin", "user"},
 		Country:           "NGA",
 		Timezone:          "Africa/Lagos",

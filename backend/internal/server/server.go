@@ -231,6 +231,21 @@ func New(cfg *config.Config) (*Server, error) {
 			identityCfg,
 		)
 		log.Info("identity service initialized")
+
+		// Ensure platform super admin exists (idempotent; safe in production).
+		if result, err := bootstrap.EnsureSuperAdmin(context.Background(), bootstrap.Dependencies{
+			Config:   cfg,
+			DB:       db,
+			Identity: identitySvc,
+			Logger:   log.Logger,
+		}, ""); err != nil {
+			log.Warn("super admin bootstrap failed", zap.Error(err))
+		} else if result != nil {
+			log.Info("super admin bootstrap",
+				zap.Bool("already_completed", result.AlreadyCompleted),
+				zap.String("message", result.Message),
+			)
+		}
 	}
 
 	// Create identity handlers

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -273,13 +274,29 @@ func (s *Service) Login(ctx context.Context, req *models.LoginRequest, ip, userA
 
 	user, err := s.store.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		s.logger.Error("login failed: user lookup",
+		// Missing user is an authentication failure, never a 500.
+		if errors.Is(err, store.ErrUserNotFound) {
+			s.logger.Info("login: user not found",
+				zap.String("step", "user_lookup"),
+				zap.String("email", req.Email),
+			)
+			return nil, ide.ErrInvalidCredentials
+		}
+		s.logger.Error("login: database failure",
 			zap.String("step", "user_lookup"),
 			zap.String("email", req.Email),
 			zap.Error(err),
 		)
 		return nil, apperrors.ErrInternalServer
 	}
+	if user == nil {
+		s.logger.Info("login: user not found",
+			zap.String("step", "user_lookup"),
+			zap.String("email", req.Email),
+		)
+		return nil, ide.ErrInvalidCredentials
+	}
+
 	s.logger.Info("login: user found",
 		zap.String("step", "user_found"),
 		zap.String("email", req.Email),
@@ -288,29 +305,37 @@ func (s *Service) Login(ctx context.Context, req *models.LoginRequest, ip, userA
 	)
 
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
-		s.logger.Warn("login failed: account locked",
+		s.logger.Warn("login: account locked",
 			zap.String("step", "account_locked"),
 			zap.String("email", req.Email),
 			zap.Time("locked_until", *user.LockedUntil),
 		)
 		return nil, ide.ErrAccountLocked
 	}
-	if user.Status == "suspended" {
-		s.logger.Warn("login failed: account suspended",
+	switch user.Status {
+	case "suspended":
+		s.logger.Warn("login: account disabled",
 			zap.String("step", "account_suspended"),
 			zap.String("email", req.Email),
+			zap.String("status", user.Status),
 		)
 		return nil, ide.ErrAccountSuspended
-	}
-	if user.Status == "banned" {
-		s.logger.Warn("login failed: account banned",
+	case "banned":
+		s.logger.Warn("login: account disabled",
 			zap.String("step", "account_banned"),
 			zap.String("email", req.Email),
+			zap.String("status", user.Status),
 		)
 		return nil, ide.ErrAccountBanned
-	}
-	if user.Status == "pending" {
-		s.logger.Warn("login failed: account not verified",
+	case "inactive", "disabled":
+		s.logger.Warn("login: account disabled",
+			zap.String("step", "account_inactive"),
+			zap.String("email", req.Email),
+			zap.String("status", user.Status),
+		)
+		return nil, ide.ErrAccountInactive
+	case "pending":
+		s.logger.Warn("login: account not verified",
 			zap.String("step", "account_not_verified"),
 			zap.String("email", req.Email),
 		)
@@ -323,7 +348,7 @@ func (s *Service) Login(ctx context.Context, req *models.LoginRequest, ip, userA
 	)
 	if err := auth.VerifyPassword(req.Password, user.PasswordHash); err != nil {
 		attempts := user.FailedLoginAttempts + 1
-		s.logger.Warn("login failed: invalid password",
+		s.logger.Info("login: invalid password",
 			zap.String("step", "password_verification"),
 			zap.String("email", req.Email),
 			zap.Int("failed_attempts", attempts),
@@ -466,6 +491,9 @@ func (s *Service) Logout(ctx context.Context, userID, ip, userAgent string) erro
 func (s *Service) GetProfile(ctx context.Context, userID string) (*models.User, error) {
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, store.ErrUserNotFound) {
+			return nil, apperrors.ErrNotFound
+		}
 		return nil, apperrors.ErrInternalServer
 	}
 	if user == nil {
@@ -478,6 +506,9 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (*models.User, 
 func (s *Service) UpdateProfile(ctx context.Context, userID string, req *models.UpdateProfileRequest) (*models.User, error) {
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, store.ErrUserNotFound) {
+			return nil, apperrors.ErrNotFound
+		}
 		return nil, apperrors.ErrInternalServer
 	}
 	if user == nil {
@@ -999,6 +1030,9 @@ func (s *Service) HasSuperAdmin(ctx context.Context) (bool, error) {
 func (s *Service) GetProfileByEmail(ctx context.Context, email string) (*models.User, error) {
 	user, err := s.store.GetUserByEmail(ctx, email)
 	if err != nil {
+		if errors.Is(err, store.ErrUserNotFound) {
+			return nil, nil
+		}
 		return nil, apperrors.ErrInternalServer
 	}
 	return user, nil

@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	apperrors "github.com/coindistro/backend/internal/errors"
 	"github.com/coindistro/backend/internal/identity/models"
 	"github.com/coindistro/backend/internal/identity/service"
 	"github.com/coindistro/backend/internal/response"
@@ -83,11 +84,21 @@ func (h *Handlers) Login(c *gin.Context) {
 
 	result, err := h.Svc.Login(c.Request.Context(), &req, ip, userAgent)
 	if err != nil {
-		h.logger.Error("login: handler error",
-			zap.String("step", "handler_error"),
-			zap.String("email", req.Email),
-			zap.Error(err),
-		)
+		// Auth failures are expected; only unexpected errors are logged as Error.
+		if appErr := apperrors.GetAppError(err); appErr != nil && appErr.StatusCode < 500 {
+			h.logger.Info("login: authentication failed",
+				zap.String("step", "handler_auth_failed"),
+				zap.String("email", req.Email),
+				zap.String("code", appErr.Code),
+				zap.Int("status", appErr.StatusCode),
+			)
+		} else {
+			h.logger.Error("login: handler error",
+				zap.String("step", "handler_error"),
+				zap.String("email", req.Email),
+				zap.Error(err),
+			)
+		}
 		response.HandleError(c, err)
 		return
 	}

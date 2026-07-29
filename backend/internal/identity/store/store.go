@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,10 @@ import (
 
 	"github.com/coindistro/backend/internal/identity/models"
 )
+
+// ErrUserNotFound is returned when a user lookup finds no matching row.
+// Callers must treat this as a not-found condition, never as an internal server error.
+var ErrUserNotFound = errors.New("user not found")
 
 // Store handles all database operations for the identity service.
 type Store struct {
@@ -105,8 +110,8 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (*models.User,
 
 	user, err := s.scanUser(ctx, query, email)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
+		if errors.Is(err, ErrUserNotFound) || errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -125,8 +130,8 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (*models.User, error
 
 	user, err := s.scanUser(ctx, query, id)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
+		if errors.Is(err, ErrUserNotFound) || errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -145,7 +150,7 @@ func (s *Store) GetUserByReferralCode(ctx context.Context, code string) (*models
 
 	user, err := s.scanUser(ctx, query, code)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -242,7 +247,7 @@ func (s *Store) GetUserByResetToken(ctx context.Context, token string) (*models.
 
 	user, err := s.scanUser(ctx, query, token)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -262,7 +267,7 @@ func (s *Store) GetUserByVerificationToken(ctx context.Context, token string) (*
 
 	user, err := s.scanUser(ctx, query, token)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -332,7 +337,7 @@ func (s *Store) GetSessionByRefreshToken(ctx context.Context, tokenHash string) 
 		&session.TerminatedAt, &session.CreatedAt, &session.UpdatedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -409,7 +414,7 @@ func (s *Store) GetInvitationCredits(ctx context.Context, userID string) (*model
 	).Scan(&credit.ID, &credit.UserID, &credit.TotalCredits, &credit.UsedCredits,
 		&credit.PendingCredits, &credit.CreatedAt, &credit.UpdatedAt)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			// Default: no credits
 			return &models.InvitationCredit{
 				UserID: userID, TotalCredits: 0, UsedCredits: 0, PendingCredits: 0,
@@ -465,7 +470,7 @@ func (s *Store) GetInvitationByCode(ctx context.Context, code string) (*models.I
 		&inv.Status, &inv.Message, &inv.Role, &inv.ConsumedAt, &inv.ExpiresAt,
 		&inv.CreatedAt, &inv.UpdatedAt)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -672,7 +677,7 @@ func (s *Store) GetGenesisConfig(ctx context.Context) (*models.GenesisConfig, er
 	).Scan(&config.ID, &config.MaxGenesisMembers, &config.CurrentGenesisCount, &config.IsActive,
 		&config.CreatedAt, &config.UpdatedAt)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUserNotFound) {
 			return &models.GenesisConfig{MaxGenesisMembers: 10000, CurrentGenesisCount: 0, IsActive: true}, nil
 		}
 		return nil, err
@@ -887,6 +892,10 @@ func (s *Store) scanUserFromRow(row scannable) (*models.User, error) {
 		&u.Roles, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
 	)
 	if err != nil {
+		// pgx returns ErrNoRows when no user matches; never treat as internal failure.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
 		return nil, fmt.Errorf("failed to scan user: %w", err)
 	}
 	return u, nil
