@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS investment_plans (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_investment_plans_enabled ON investment_plans(enabled);
+-- Re-run safe: skip index creation if the plan index already exists.
+CREATE INDEX IF NOT EXISTS idx_investment_plans_enabled ON investment_plans(enabled);
 
 -- ─── Investments ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS investments (
@@ -42,12 +43,13 @@ CREATE TABLE IF NOT EXISTS investments (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_investments_user_id ON investments(user_id);
-CREATE INDEX idx_investments_plan_id ON investments(plan_id);
-CREATE INDEX idx_investments_status ON investments(status);
-CREATE INDEX idx_investments_payment_reference ON investments(payment_reference);
-CREATE INDEX idx_investments_matures_at ON investments(matures_at) WHERE status = 'active';
-CREATE UNIQUE INDEX idx_investments_payment_ref_provider ON investments(payment_provider, payment_reference);
+-- Re-run safe: skip index creation if these indexes already exist.
+CREATE INDEX IF NOT EXISTS idx_investments_user_id ON investments(user_id);
+CREATE INDEX IF NOT EXISTS idx_investments_plan_id ON investments(plan_id);
+CREATE INDEX IF NOT EXISTS idx_investments_status ON investments(status);
+CREATE INDEX IF NOT EXISTS idx_investments_payment_reference ON investments(payment_reference);
+CREATE INDEX IF NOT EXISTS idx_investments_matures_at ON investments(matures_at) WHERE status = 'active';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_investments_payment_ref_provider ON investments(payment_provider, payment_reference);
 
 -- ─── Payment Transactions ─────────────────────────────
 CREATE TABLE IF NOT EXISTS payment_transactions (
@@ -63,10 +65,11 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_payment_transactions_user_id ON payment_transactions(user_id);
-CREATE INDEX idx_payment_transactions_reference ON payment_transactions(reference);
-CREATE INDEX idx_payment_transactions_provider_ref ON payment_transactions(provider, reference);
-CREATE INDEX idx_payment_transactions_status ON payment_transactions(status);
+-- Re-run safe: skip index creation if these indexes already exist.
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_reference ON payment_transactions(reference);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_provider_ref ON payment_transactions(provider, reference);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
 
 -- ─── Wallets (Internal CDT Ledger) ────────────────────
 CREATE TABLE IF NOT EXISTS wallets (
@@ -80,7 +83,8 @@ CREATE TABLE IF NOT EXISTS wallets (
     UNIQUE(user_id)
 );
 
-CREATE INDEX idx_wallets_user_id ON wallets(user_id);
+-- Re-run safe: skip the wallet-user index if it already exists.
+CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets(user_id);
 
 -- ─── Wallet Transactions ──────────────────────────────
 CREATE TABLE IF NOT EXISTS wallet_transactions (
@@ -95,9 +99,10 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
-CREATE INDEX idx_wallet_transactions_type ON wallet_transactions(type);
-CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_at);
+-- Re-run safe: skip index creation if these indexes already exist.
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type ON wallet_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_created_at ON wallet_transactions(created_at);
 
 -- ─── CDT Pricing ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS cdt_pricing (
@@ -108,9 +113,10 @@ CREATE TABLE IF NOT EXISTS cdt_pricing (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Insert default pricing (₦10 per CDT)
+-- Re-run safe: use a deterministic identifier so the default price row can be inserted once.
 INSERT INTO cdt_pricing (id, price_ngn)
-VALUES (uuid_generate_v4(), 10.00);
+VALUES ('11111111-1111-1111-1111-111111111111'::uuid, 10.00)
+ON CONFLICT (id) DO NOTHING;
 
 -- ─── Webhook Processing Log ───────────────────────────
 CREATE TABLE IF NOT EXISTS webhook_events (
@@ -125,15 +131,20 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     UNIQUE(provider, event_id)
 );
 
-CREATE INDEX idx_webhook_events_provider ON webhook_events(provider);
-CREATE INDEX idx_webhook_events_reference ON webhook_events(reference);
+-- Re-run safe: skip index creation if these indexes already exist.
+CREATE INDEX IF NOT EXISTS idx_webhook_events_provider ON webhook_events(provider);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_reference ON webhook_events(reference);
 
 -- ─── Seed Default Investment Plans ────────────────────
+-- Re-run safe: create a unique plan name index so seed rows can be skipped on later runs.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_investment_plans_name ON investment_plans(name);
+
 INSERT INTO investment_plans (id, name, description, minimum_amount, maximum_amount, currency, roi_percent, enabled) VALUES
-    (uuid_generate_v4(), 'Starter', 'Perfect for beginners. Start your CDT investment journey with a small amount.', 1000, 50000, 'NGN', 5.0000, true),
-    (uuid_generate_v4(), 'Builder', 'Build your CDT portfolio with medium-term investment.', 50000, 500000, 'NGN', 10.0000, true),
-    (uuid_generate_v4(), 'Pro', 'Professional grade investment for serious investors.', 500000, 5000000, 'NGN', 15.0000, true),
-    (uuid_generate_v4(), 'Whale', 'Maximum returns for maximum investment. Exclusive high-tier plan.', 5000000, 50000000, 'NGN', 25.0000, true);
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'Starter', 'Perfect for beginners. Start your CDT investment journey with a small amount.', 1000, 50000, 'NGN', 5.0000, true),
+    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid, 'Builder', 'Build your CDT portfolio with medium-term investment.', 50000, 500000, 'NGN', 10.0000, true),
+    ('cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid, 'Pro', 'Professional grade investment for serious investors.', 500000, 5000000, 'NGN', 15.0000, true),
+    ('dddddddd-dddd-dddd-dddd-dddddddddddddd'::uuid, 'Whale', 'Maximum returns for maximum investment. Exclusive high-tier plan.', 5000000, 50000000, 'NGN', 25.0000, true)
+ON CONFLICT (name) DO NOTHING;
 
 -- ─── Triggers ─────────────────────────────────────────
 DO $$
