@@ -326,6 +326,23 @@ func New(cfg *config.Config) (*Server, error) {
 
 		investmentHandlers = investhandlers.New(investmentSvc, log.Logger)
 		log.Info("investment service initialized")
+
+		// Register Genesis maturity processor as early as possible so scheduler Start logs tasks >= 1.
+		if sched != nil {
+			sched.AddTask(scheduler.Task{
+				ID:       "investment_maturity_check",
+				Name:     "Investment Maturity Check",
+				Interval: 1 * time.Minute,
+				Handler: func(ctx context.Context) error {
+					return investmentSvc.ProcessMaturedInvestments(ctx)
+				},
+			})
+			log.Info("Scheduler task registered",
+				zap.String("task_id", "investment_maturity_check"),
+				zap.String("name", "Investment Maturity Check"),
+				zap.Duration("interval", time.Minute),
+			)
+		}
 	}
 
 	// Create identity handlers
@@ -433,21 +450,33 @@ func (s *Server) Start() error {
 		s.logger.Info("worker pool started")
 	}
 
-	// Start scheduler
+	// Start scheduler (maturity task is registered during New when investment service is available)
 	if s.sched != nil {
-		// Register investment maturity check task (every 1 minute)
+		// Defensive re-register if New path skipped (e.g. late investment wiring)
 		if s.investmentSvc != nil {
-			s.sched.AddTask(scheduler.Task{
-				ID:       "investment_maturity_check",
-				Name:     "Investment Maturity Check",
-				Interval: 1 * time.Minute,
-				Handler: func(ctx context.Context) error {
-					return s.investmentSvc.ProcessMaturedInvestments(ctx)
-				},
-			})
-			s.logger.Info("investment maturity check task registered")
+			statuses := s.sched.GetStatus()
+			hasMaturity := false
+			for _, st := range statuses {
+				if st.TaskID == "investment_maturity_check" {
+					hasMaturity = true
+					break
+				}
+			}
+			if !hasMaturity {
+				s.sched.AddTask(scheduler.Task{
+					ID:       "investment_maturity_check",
+					Name:     "Investment Maturity Check",
+					Interval: 1 * time.Minute,
+					Handler: func(ctx context.Context) error {
+						return s.investmentSvc.ProcessMaturedInvestments(ctx)
+					},
+				})
+				s.logger.Info("Scheduler task registered",
+					zap.String("task_id", "investment_maturity_check"),
+					zap.Duration("interval", time.Minute),
+				)
+			}
 		}
-
 		s.sched.Start()
 	}
 

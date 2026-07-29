@@ -527,6 +527,13 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 }
 
 func (s *Service) processSuccessfulPayment(ctx context.Context, provider, reference string, amountPaid float64, currency string) error {
+	s.logger.Info("payment verified",
+		zap.String("provider", provider),
+		zap.String("reference", reference),
+		zap.Float64("amount", amountPaid),
+		zap.String("currency", currency),
+	)
+
 	// Get the pending investment
 	inv, err := s.store.GetInvestmentByReference(ctx, provider, reference)
 	if err != nil {
@@ -579,6 +586,13 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 	if err != nil {
 		return err
 	}
+
+	s.logger.Info("CDT credited",
+		zap.String("user_id", inv.UserID),
+		zap.Float64("amount", inv.AllocatedCDT),
+		zap.String("reference", reference),
+		zap.String("type", "locked"),
+	)
 
 	// Credit locked CDT to wallet
 	if err := s.store.CreditWalletLocked(ctx, wallet.ID, inv.AllocatedCDT); err != nil {
@@ -637,6 +651,7 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Inve
 	if err != nil {
 		return nil, err
 	}
+	s.logger.Info("investments loaded", zap.String("user_id", userID), zap.Int("count", len(investments)))
 
 	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
 	if err != nil {
@@ -662,9 +677,13 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Inve
 			dash.CompletedInvestments++
 		}
 
+		planName := ""
+		if inv.Plan != nil {
+			planName = inv.Plan.Name
+		}
 		summary := &models.InvestmentSummary{
 			ID:             inv.ID,
-			PlanName:       inv.Plan.Name,
+			PlanName:       planName,
 			AmountPaid:     inv.AmountPaid,
 			AllocatedCDT:   inv.AllocatedCDT,
 			ROICDT:         inv.ROICDT,
@@ -707,7 +726,17 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Inve
 // ─── Wallet ───────────────────────────────────────────
 
 func (s *Service) GetWallet(ctx context.Context, userID string) (*models.Wallet, error) {
-	return s.store.GetOrCreateWallet(ctx, userID)
+	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	s.logger.Info("wallet loaded",
+		zap.String("user_id", userID),
+		zap.Float64("available", wallet.AvailableBalance),
+		zap.Float64("locked", wallet.LockedBalance),
+		zap.Float64("total", wallet.TotalBalance),
+	)
+	return wallet, nil
 }
 
 func (s *Service) GetWalletTransactions(ctx context.Context, userID string, page, perPage int) ([]*models.WalletTransaction, int, error) {
@@ -727,6 +756,8 @@ func (s *Service) ProcessMaturedInvestments(ctx context.Context) error {
 		return err
 	}
 
+	s.logger.Info("investment maturity check started", zap.Int("matured_count", len(investments)))
+
 	for _, inv := range investments {
 		if err := s.processMaturedInvestment(ctx, inv); err != nil {
 			s.logger.Error("failed to process matured investment",
@@ -735,6 +766,12 @@ func (s *Service) ProcessMaturedInvestments(ctx context.Context) error {
 			)
 			continue
 		}
+		s.logger.Info("investment maturity processed",
+			zap.String("investment_id", inv.ID),
+			zap.String("user_id", inv.UserID),
+			zap.Float64("payout", inv.AllocatedCDT+inv.ROICDT),
+			zap.Float64("roi", inv.ROICDT),
+		)
 	}
 	return nil
 }
@@ -779,7 +816,7 @@ func (s *Service) processMaturedInvestment(ctx context.Context, inv *models.Inve
 		BalanceBefore: wallet.TotalBalance,
 		BalanceAfter:  wallet.TotalBalance + inv.AllocatedCDT + roiCDT,
 		Reference:     inv.ID,
-		Description:   fmt.Sprintf("Investment matured - %s plan unlocked", inv.Plan.Name),
+		Description:   fmt.Sprintf("Investment matured - %s plan unlocked", planNameOrDefault(inv)),
 		CreatedAt:     now,
 	})
 
@@ -792,9 +829,17 @@ func (s *Service) processMaturedInvestment(ctx context.Context, inv *models.Inve
 		BalanceBefore: wallet.TotalBalance,
 		BalanceAfter:  wallet.TotalBalance + roiCDT,
 		Reference:     inv.ID,
-		Description:   fmt.Sprintf("ROI credited - %s plan (%.2f%%)", inv.Plan.Name, inv.ROIPercent),
+		Description:   fmt.Sprintf("ROI credited - %s plan (%.2f%%)", planNameOrDefault(inv), inv.ROIPercent),
 		CreatedAt:     now,
 	})
+
+	s.logger.Info("CDT credited",
+		zap.String("user_id", inv.UserID),
+		zap.String("investment_id", inv.ID),
+		zap.Float64("unlocked_cdt", inv.AllocatedCDT),
+		zap.Float64("roi_cdt", roiCDT),
+		zap.Float64("total_payout", totalPayout),
+	)
 
 	s.publish(events.EventEarnParticipationCompleted, map[string]interface{}{
 		"user_id":       inv.UserID,
@@ -808,6 +853,13 @@ func (s *Service) processMaturedInvestment(ctx context.Context, inv *models.Inve
 	})
 
 	return nil
+}
+
+func planNameOrDefault(inv *models.Investment) string {
+	if inv != nil && inv.Plan != nil && inv.Plan.Name != "" {
+		return inv.Plan.Name
+	}
+	return "Genesis"
 }
 
 // ─── Admin ────────────────────────────────────────────

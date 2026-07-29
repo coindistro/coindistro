@@ -505,6 +505,9 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 		// Wallet
 		authed.GET("/wallet", h.GetWallet)
 		authed.GET("/wallet/transactions", h.GetWalletTransactions)
+
+		// Backward-compatible portfolio endpoint (aggregates wallet + investments)
+		authed.GET("/earn/portfolio", h.PortfolioCompatibility)
 	}
 
 	// Admin routes

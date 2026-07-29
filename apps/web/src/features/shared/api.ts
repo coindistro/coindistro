@@ -313,8 +313,25 @@ export async function getEarnProduct(id: string): Promise<EarnProduct> {
 // EARN - PORTFOLIO
 // ============================================================
 
+/** @deprecated Prefer getWallet() + getInvestments(). Kept for legacy callers. */
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   return api.get<PortfolioOverview>("/api/v1/earn/portfolio");
+}
+
+export async function getWallet() {
+  return api.get("/api/v1/wallet");
+}
+
+export async function getInvestments() {
+  return api.get("/api/v1/earn/investments");
+}
+
+export async function getInvestmentPlans() {
+  return api.get("/api/v1/earn/plans", { auth: false });
+}
+
+export async function getWalletTransactions(page = 1, perPage = 20) {
+  return api.get(`/api/v1/wallet/transactions?page=${page}&per_page=${perPage}`);
 }
 
 // ============================================================

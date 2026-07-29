@@ -335,8 +335,28 @@ export async function getEarnProduct(id: string): Promise<EarnProduct> {
   return unwrap(api.get<EarnProduct>(`/api/v1/earn/products/${id}`));
 }
 
+/** @deprecated Prefer getWallet() + getInvestments() (Genesis Investor Program). */
 export async function getEarnPortfolio(): Promise<EarnPortfolioResponse> {
+  // Compatibility path still available on the API; new UI should not call this.
   return unwrap(api.get<EarnPortfolioResponse>("/api/v1/earn/portfolio"));
+}
+
+export async function getWallet() {
+  return unwrap(api.get("/api/v1/wallet"));
+}
+
+export async function getInvestments() {
+  return unwrap(api.get("/api/v1/earn/investments"));
+}
+
+export async function getInvestmentPlans() {
+  return unwrap(api.get("/api/v1/earn/plans"));
+}
+
+export async function getWalletTransactions(page = 1, perPage = 20) {
+  return unwrap(
+    api.get(`/api/v1/wallet/transactions?page=${page}&per_page=${perPage}`),
+  );
 }
 
 export async function joinEarnProduct(productId: string, input: JoinProductInput): Promise<Participation> {

@@ -106,6 +106,7 @@ export interface Invitation {
   created_at: string;
 }
 
+/** @deprecated Use Wallet + InvestmentDashboard (Genesis Investor Program). */
 export interface EarnPortfolio {
   total_assets_in_earn: number;
   estimated_rewards: number;
@@ -116,6 +117,79 @@ export interface EarnPortfolio {
   locked_balance: number;
   allocation_by_product: Record<string, number>;
   allocation_by_asset: Record<string, number>;
+}
+
+/** Internal CDT wallet balances (GET /api/v1/wallet). */
+export interface Wallet {
+  id: string;
+  user_id: string;
+  available_balance: number;
+  locked_balance: number;
+  staking_balance: number;
+  total_balance: number;
+  updated_at: string;
+}
+
+export type InvestmentStatus =
+  | "pending"
+  | "active"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | string;
+
+/** Summary row for a Genesis investment. */
+export interface InvestmentSummary {
+  id: string;
+  plan_name: string;
+  amount_paid: number;
+  allocated_cdt: number;
+  roi_cdt: number;
+  roi_percent: number;
+  status: InvestmentStatus;
+  lock_period_days: number;
+  days_remaining?: number;
+  progress_pct?: number;
+  started_at?: string | null;
+  matures_at?: string | null;
+  created_at: string;
+}
+
+/** Dashboard payload (GET /api/v1/earn/investments). */
+export interface InvestmentDashboard {
+  total_invested: number;
+  locked_cdt: number;
+  available_cdt: number;
+  total_roi_earned: number;
+  active_investments: number;
+  completed_investments: number;
+  upcoming_maturity?: string | null;
+  investments: InvestmentSummary[];
+}
+
+export interface InvestmentPlan {
+  id: string;
+  name: string;
+  description?: string;
+  minimum_amount: number;
+  maximum_amount: number;
+  currency: string;
+  roi_percent: number;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  wallet_id: string;
+  type: string;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  reference?: string;
+  description?: string;
+  created_at: string;
 }
 
 export interface AdminUserSummary {

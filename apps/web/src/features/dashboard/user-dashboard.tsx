@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/features/authentication/auth-provider";
 import * as identityApi from "@/features/identity/api";
-import { getEarnPortfolio } from "@/features/earn/api";
+import { useInvestments, useWallet } from "@/features/earn/hooks";
 import { useToast } from "@/features/shared/providers/toast-provider";
 import {
   displayName,
@@ -45,6 +45,43 @@ import {
   initials,
   profileCompletion,
 } from "@/lib/utils/format";
+import type { InvestmentSummary } from "@/lib/api/types";
+
+function formatCdt(n: number | undefined | null, digits = 4): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function statusVariant(
+  status: string,
+): "success" | "warning" | "secondary" | "danger" | "outline" {
+  switch (status) {
+    case "active":
+      return "success";
+    case "completed":
+      return "secondary";
+    case "pending":
+      return "warning";
+    case "failed":
+    case "cancelled":
+      return "danger";
+    default:
+      return "outline";
+  }
+}
 
 function PlaceholderMark({ label = "Placeholder" }: { label?: string }) {
   return (
@@ -75,10 +112,8 @@ export function UserDashboard() {
     queryKey: ["sessions"],
     queryFn: identityApi.getSessions,
   });
-  const earnQ = useQuery({
-    queryKey: ["earn", "portfolio"],
-    queryFn: getEarnPortfolio,
-  });
+  const walletQ = useWallet();
+  const investmentsQ = useInvestments();
 
   const me = profileQ.data ?? user;
   const name = displayName(me);
@@ -86,7 +121,9 @@ export function UserDashboard() {
   const referrals = referralQ.data;
   const activity = activityQ.data ?? [];
   const sessions = sessionsQ.data ?? [];
-  const earn = earnQ.data;
+  const wallet = walletQ.data;
+  const investDash = investmentsQ.data;
+  const investments: InvestmentSummary[] = investDash?.investments ?? [];
   const currentSession = sessions.find((s) => s.is_current) ?? sessions[0];
 
   const copyReferral = async () => {
@@ -228,121 +265,208 @@ export function UserDashboard() {
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Portfolio / Earn */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="flex flex-row items-start justify-between space-y-0">
-            <div>
-              <CardTitle className="text-base">Portfolio</CardTitle>
-              <CardDescription>Earn balances and rewards</CardDescription>
-            </div>
-            {!earn ? <PlaceholderMark label="Wallet soon" /> : null}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {earnQ.isLoading ? (
-              <Skeleton className="h-28 w-full" />
-            ) : earn ? (
-              <>
-                <div>
-                  <p className="text-xs text-muted-foreground">Assets in Earn</p>
-                  <p className="text-2xl font-bold tabular-nums">
-                    {earn.total_assets_in_earn.toLocaleString(undefined, {
-                      maximumFractionDigits: 4,
-                    })}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Today</p>
-                    <p className="font-semibold tabular-nums">{earn.todays_rewards}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Lifetime</p>
-                    <p className="font-semibold tabular-nums">{earn.lifetime_rewards}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Active products</p>
-                    <p className="font-semibold">{earn.active_products}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Locked</p>
-                    <p className="font-semibold tabular-nums">{earn.locked_balance}</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                <Wallet className="mb-2 h-5 w-5" />
-                Portfolio and wallet balances will appear when Earn / Wallet APIs are active.
-                Spot balances are not available in this milestone.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Wallet Overview */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <Typography variant="h4" className="text-base font-semibold">
+              Wallet Overview
+            </Typography>
+            <p className="text-sm text-muted-foreground">Your CDT balances</p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/app/wallet">
+              Open wallet <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        {walletQ.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        ) : walletQ.isError ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Wallet could not be loaded. Please refresh or try again later.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Available CDT"
+              value={formatCdt(wallet?.available_balance)}
+              description="Ready to use"
+              icon={<Wallet className="h-4 w-4" />}
+            />
+            <StatCard
+              title="Locked CDT"
+              value={formatCdt(wallet?.locked_balance)}
+              description="In active investments"
+              icon={<PiggyBank className="h-4 w-4" />}
+            />
+            <StatCard
+              title="Staking Balance"
+              value={formatCdt(wallet?.staking_balance)}
+              description="Staked CDT"
+              icon={<Sparkles className="h-4 w-4" />}
+            />
+            <StatCard
+              title="Total Balance"
+              value={formatCdt(wallet?.total_balance)}
+              description="All CDT holdings"
+              icon={<Wallet className="h-4 w-4" />}
+            />
+          </div>
+        )}
+      </div>
 
-        {/* Earn summary + referrals */}
-        <Card className="lg:col-span-1">
+      {/* Genesis Investments */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div>
+            <CardTitle className="text-base">Genesis Investments</CardTitle>
+            <CardDescription>
+              Active and matured positions in the Genesis Investor Program
+            </CardDescription>
+          </div>
+          {investDash ? (
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <Badge variant="success">{investDash.active_investments} active</Badge>
+              <Badge variant="secondary">{investDash.completed_investments} matured</Badge>
+              <Badge variant="outline">
+                Pending ROI {formatCdt(investDash.total_roi_earned)} CDT
+              </Badge>
+            </div>
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {investmentsQ.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : investmentsQ.isError ? (
+            <p className="text-sm text-muted-foreground">
+              Investments could not be loaded. Please try again later.
+            </p>
+          ) : investments.length === 0 ? (
+            <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed p-6">
+              <PiggyBank className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="font-medium">No Investments Yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Start earning by investing in a Genesis Plan.
+                </p>
+              </div>
+              <Button asChild>
+                <Link href="/app/earn">View Investment Plans</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {investments.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="rounded-lg border bg-card p-4 text-sm shadow-sm"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{inv.plan_name || "Genesis Plan"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Lock {inv.lock_period_days} days
+                      </p>
+                    </div>
+                    <Badge variant={statusVariant(String(inv.status))} className="capitalize">
+                      {inv.status}
+                    </Badge>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Invested</dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatCdt(inv.amount_paid, 2)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">CDT Allocated</dt>
+                      <dd className="font-medium tabular-nums">
+                        {formatCdt(inv.allocated_cdt)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">ROI %</dt>
+                      <dd className="font-medium tabular-nums">{inv.roi_percent}%</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">ROI CDT</dt>
+                      <dd className="font-medium tabular-nums">{formatCdt(inv.roi_cdt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Lock Duration</dt>
+                      <dd className="font-medium">{inv.lock_period_days} days</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Maturity</dt>
+                      <dd className="font-medium">{formatDate(inv.matures_at)}</dd>
+                    </div>
+                  </dl>
+                  {typeof inv.progress_pct === "number" && inv.status === "active" ? (
+                    <div className="mt-3">
+                      <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                        <span>Progress</span>
+                        <span>{Math.round(inv.progress_pct)}%</span>
+                      </div>
+                      <Progress value={Math.min(100, Math.max(0, inv.progress_pct))} />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Referrals summary */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">Earn summary</CardTitle>
-            <CardDescription>Rewards at a glance</CardDescription>
+            <CardTitle className="text-base">Referrals</CardTitle>
+            <CardDescription>Invite stats at a glance</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {earn ? (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Estimated rewards</span>
-                  <span className="font-medium tabular-nums">{earn.estimated_rewards}</span>
+            {referralQ.isLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : referrals ? (
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total invites</p>
+                  <p className="font-semibold">{referrals.total_invites}</p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Lifetime rewards</span>
-                  <span className="font-medium tabular-nums">{earn.lifetime_rewards}</span>
+                <div>
+                  <p className="text-xs text-muted-foreground">Successful</p>
+                  <p className="font-semibold">{referrals.successful_invites}</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full" asChild>
-                  <Link href="/app/earn">
-                    Open Earn <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Connect to Earn products to start earning yield and launchpool rewards.</p>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/app/earn">Explore Earn</Link>
-                </Button>
+                <div>
+                  <p className="text-xs text-muted-foreground">Conversion</p>
+                  <p className="font-semibold">{referrals.conversion_rate}%</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Rewards</p>
+                  <p className="font-semibold">{referrals.rewards_earned}</p>
+                </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Referral data unavailable.</p>
             )}
-            <div className="border-t pt-3">
-              <p className="mb-2 text-sm font-medium">Referral statistics</p>
-              {referralQ.isLoading ? (
-                <Skeleton className="h-16 w-full" />
-              ) : referrals ? (
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total invites</p>
-                    <p className="font-semibold">{referrals.total_invites}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Successful</p>
-                    <p className="font-semibold">{referrals.successful_invites}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Conversion</p>
-                    <p className="font-semibold">{referrals.conversion_rate}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Rewards</p>
-                    <p className="font-semibold">{referrals.rewards_earned}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Referral data unavailable.</p>
-              )}
-            </div>
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <Link href="/app/referrals">
+                Open referrals <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
           </CardContent>
         </Card>
 
-        {/* Activity + security */}
-        <Card className="lg:col-span-1">
+        {/* Activity */}
+        <Card>
           <CardHeader>
             <CardTitle className="text-base">Latest activity</CardTitle>
             <CardDescription>Security and account events</CardDescription>
