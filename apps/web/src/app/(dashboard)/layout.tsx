@@ -1,4 +1,4 @@
-import { RequireAuth } from "@/features/authentication/require-auth";
+import { AuthGuard } from "@/features/authentication/guards";
 import { UserDashboardChrome } from "@/features/dashboard/dashboard-chrome";
 
 // Auth-gated user portal — skip static prerender.
@@ -10,8 +10,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RequireAuth>
+    <AuthGuard>
       <UserDashboardChrome>{children}</UserDashboardChrome>
-    </RequireAuth>
+    </AuthGuard>
   );
 }

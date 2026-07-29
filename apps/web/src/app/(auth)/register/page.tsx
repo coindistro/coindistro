@@ -19,8 +19,18 @@ import {
   registerSchema,
   type RegisterValues,
 } from "@/features/authentication/schemas";
-import { ApiError, postLoginPath } from "@/lib/api/types";
+import { postLoginPath } from "@/features/authentication/roles";
+import { mapAuthError } from "@/features/authentication/auth-errors";
 import { useToast } from "@/features/shared/providers/toast-provider";
+
+function needsEmailVerification(user: {
+  status?: string;
+  is_verified?: boolean;
+}): boolean {
+  if (user.is_verified === false) return true;
+  if (user.status === "pending") return true;
+  return false;
+}
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
@@ -51,13 +61,25 @@ export default function RegisterPage() {
         display_name: values.display_name || undefined,
         referral_code: values.referral_code,
       });
+
+      if (needsEmailVerification(user)) {
+        toast({
+          message: "Account created. Please verify your email to continue.",
+          variant: "success",
+        });
+        router.replace(
+          `/verify-email?pending=1&email=${encodeURIComponent(user.email)}`,
+        );
+        return;
+      }
+
       toast({
         message: "Account created successfully. Welcome to Coindistro!",
         variant: "success",
       });
       router.replace(postLoginPath(user.roles));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Registration failed");
+      setError(mapAuthError(e, "Registration failed"));
     }
   });
 
@@ -82,6 +104,13 @@ export default function RegisterPage() {
         </Field>
         <Field label="Username" htmlFor="username" error={form.formState.errors.username?.message}>
           <Input id="username" autoComplete="username" {...form.register("username")} />
+        </Field>
+        <Field
+          label="Display name"
+          htmlFor="display_name"
+          error={form.formState.errors.display_name?.message}
+        >
+          <Input id="display_name" autoComplete="name" {...form.register("display_name")} />
         </Field>
         <Field
           label="Referral code"

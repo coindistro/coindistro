@@ -1,6 +1,6 @@
-import { RequireAuth } from "@/features/authentication/require-auth";
+import { RoleGuard } from "@/features/authentication/guards";
 import { AdminChrome } from "@/features/admin/admin-chrome";
-import { ADMIN_ROLES } from "@/lib/api/types";
+import { ADMIN_ROLES } from "@/features/authentication/roles";
 
 // Auth-gated control plane — skip static prerender (Radix Slot + client session).
 export const dynamic = "force-dynamic";
@@ -11,8 +11,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RequireAuth roles={[...ADMIN_ROLES]}>
+    <RoleGuard roles={[...ADMIN_ROLES]} fallbackPath="/dashboard">
       <AdminChrome>{children}</AdminChrome>
-    </RequireAuth>
+    </RoleGuard>
   );
 }

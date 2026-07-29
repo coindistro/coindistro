@@ -193,17 +193,15 @@ export class ApiError extends Error {
   }
 }
 
-/** Roles that may access the admin control plane. */
-export const ADMIN_ROLES = ["super_admin", "admin", "moderator"] as const;
-
-export function isAdminRole(roles?: string[] | null): boolean {
-  if (!roles?.length) return false;
-  return roles.some((r) => (ADMIN_ROLES as readonly string[]).includes(r));
-}
-
-export function postLoginPath(roles?: string[] | null, next?: string | null): string {
-  if (next && next.startsWith("/") && !next.startsWith("//")) {
-    return next;
-  }
-  return isAdminRole(roles) ? "/admin" : "/app/dashboard";
-}
+// Re-export role helpers so existing imports from @/lib/api/types keep working.
+export {
+  ADMIN_ROLES,
+  MERCHANT_ROLES,
+  isAdminRole,
+  isMerchantRole,
+  isSuperAdminRole,
+  postLoginPath,
+  defaultHomeForRoles,
+  hasAnyRole,
+  permissionsForRoles,
+} from "@/features/authentication/roles";

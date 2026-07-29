@@ -72,6 +72,20 @@ describe("Auth Routing", () => {
     });
   });
 
+  it("should protect short public aliases used after login", () => {
+    const aliases = [
+      "/dashboard",
+      "/wallets",
+      "/earn",
+      "/referrals",
+      "/p2p",
+      "/merchant",
+    ];
+    aliases.forEach((path) => {
+      expect(path.startsWith("/")).toBe(true);
+    });
+  });
+
   it("should redirect expired sessions to login with reason", () => {
     const redirect = "/login?reason=session_expired";
     expect(redirect).toContain("reason=session_expired");

@@ -16,7 +16,11 @@ import {
 } from "@coindistro/cds";
 import { useAuth } from "@/features/authentication/auth-provider";
 import { loginSchema, type LoginValues } from "@/features/authentication/schemas";
-import { ApiError, postLoginPath } from "@/lib/api/types";
+import { postLoginPath } from "@/features/authentication/roles";
+import {
+  mapAuthError,
+  isUnverifiedAccountError,
+} from "@/features/authentication/auth-errors";
 import { useToast } from "@/features/shared/providers/toast-provider";
 
 export default function LoginPage() {
@@ -45,7 +49,11 @@ export default function LoginPage() {
       });
       router.replace(postLoginPath(user.roles, params.get("next")));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Login failed");
+      if (isUnverifiedAccountError(e)) {
+        setError(mapAuthError(e, "Account not verified"));
+        return;
+      }
+      setError(mapAuthError(e, "Invalid email or password"));
     }
   });
 
