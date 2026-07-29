@@ -14,10 +14,11 @@ import (
 	"github.com/coindistro/backend/internal/cache"
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
-	"github.com/coindistro/backend/internal/earn/handlers"
+	earnhandlers "github.com/coindistro/backend/internal/earn/handlers"
 	"github.com/coindistro/backend/internal/featureflags"
 	"github.com/coindistro/backend/internal/health"
 	identityhandlers "github.com/coindistro/backend/internal/identity/handlers"
+	"github.com/coindistro/backend/internal/investments/handlers"
 	"github.com/coindistro/backend/internal/metrics"
 	"github.com/coindistro/backend/internal/middleware"
 	"github.com/coindistro/backend/internal/rbac"
@@ -37,7 +38,8 @@ func SetupRouter(
 	featureFlags *featureflags.Manager,
 	promMetrics *metrics.Metrics,
 	identityHandlers *identityhandlers.Handlers,
-	earnHandlers *handlers.Handlers,
+	earnHandlers *earnhandlers.Handlers,
+	investmentHandlers *handlers.Handlers,
 	workerPool *workers.Pool,
 	sched *scheduler.Scheduler,
 ) *gin.Engine {
@@ -121,7 +123,12 @@ func SetupRouter(
 
 		// Earn module routes (/api/v1/earn/...)
 		if earnHandlers != nil {
-			handlers.RegisterRoutes(v1, earnHandlers, middleware.Authentication(authService))
+			earnhandlers.RegisterRoutes(v1, earnHandlers, middleware.Authentication(authService))
+		}
+
+		// Investment module routes (/api/v1/earn/plans, /api/v1/payments/..., /api/v1/wallet, /api/v1/admin/...)
+		if investmentHandlers != nil {
+			handlers.RegisterRoutes(v1, investmentHandlers, middleware.Authentication(authService))
 		}
 
 		// Admin routes — super_admin, admin, and moderator

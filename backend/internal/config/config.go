@@ -26,11 +26,11 @@ type Config struct {
 	Telemetry    TelemetryConfig    `mapstructure:"telemetry"`
 	Email        EmailConfig        `mapstructure:"email"`
 	Storage      StorageConfig      `mapstructure:"storage"`
-	FeatureFlags  FeatureFlagsConfig  `mapstructure:"feature_flags"`
-	Registration  RegistrationConfig  `mapstructure:"registration"`
-	Workers       WorkersConfig       `mapstructure:"workers"`
-	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`
-	Monitoring    MonitoringConfig    `mapstructure:"monitoring"`
+	FeatureFlags FeatureFlagsConfig `mapstructure:"feature_flags"`
+	Registration RegistrationConfig `mapstructure:"registration"`
+	Workers      WorkersConfig      `mapstructure:"workers"`
+	Scheduler    SchedulerConfig    `mapstructure:"scheduler"`
+	Monitoring   MonitoringConfig   `mapstructure:"monitoring"`
 }
 
 // RegistrationConfig controls public onboarding / signup availability.
@@ -49,6 +49,7 @@ type AppConfig struct {
 	Version     string `mapstructure:"version"`
 	Environment string `mapstructure:"environment"`
 	Debug       bool   `mapstructure:"debug"`
+	BaseURL     string `mapstructure:"base_url"`
 }
 
 // ServerConfig holds HTTP server configuration.

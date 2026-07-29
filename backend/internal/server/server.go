@@ -24,6 +24,9 @@ import (
 	"github.com/coindistro/backend/internal/identity/handlers"
 	idservice "github.com/coindistro/backend/internal/identity/service"
 	"github.com/coindistro/backend/internal/identity/store"
+	investhandlers "github.com/coindistro/backend/internal/investments/handlers"
+	investservice "github.com/coindistro/backend/internal/investments/service"
+	investstore "github.com/coindistro/backend/internal/investments/store"
 	"github.com/coindistro/backend/internal/logger"
 	"github.com/coindistro/backend/internal/metrics"
 	"github.com/coindistro/backend/internal/rbac"
@@ -37,24 +40,26 @@ import (
 
 // Server represents the HTTP server with all infrastructure components.
 type Server struct {
-	cfg          *config.Config
-	logger       *logger.Logger
-	db           *database.Database
-	redis        *cache.Cache
-	auth         *auth.Auth
-	rbac         *rbac.RBAC
-	eventBus     *events.InMemoryBus
-	workerPool   *workers.Pool
-	jobRegistry  *workers.Registry
-	sched        *scheduler.Scheduler
-	featureFlags *featureflags.Manager
-	promMetrics  *metrics.Metrics
-	tracer       *telemetry.TracerProvider
-	emailSender  email.Sender
-	storageProv  storage.Provider
-	identitySvc  *idservice.Service
-	engine       *gin.Engine
-	http         *http.Server
+	cfg                *config.Config
+	logger             *logger.Logger
+	db                 *database.Database
+	redis              *cache.Cache
+	auth               *auth.Auth
+	rbac               *rbac.RBAC
+	eventBus           *events.InMemoryBus
+	workerPool         *workers.Pool
+	jobRegistry        *workers.Registry
+	sched              *scheduler.Scheduler
+	featureFlags       *featureflags.Manager
+	promMetrics        *metrics.Metrics
+	tracer             *telemetry.TracerProvider
+	emailSender        email.Sender
+	storageProv        storage.Provider
+	identitySvc        *idservice.Service
+	investmentSvc      *investservice.Service
+	investmentHandlers *investhandlers.Handlers
+	engine             *gin.Engine
+	http               *http.Server
 }
 
 // New creates a new Server instance with all infrastructure components.
@@ -286,11 +291,48 @@ func New(cfg *config.Config) (*Server, error) {
 		}
 	}
 
+	// Initialize Investment Service
+	var investmentSvc *investservice.Service
+	var investmentHandlers *investhandlers.Handlers
+	if db != nil && db.Pool != nil {
+		investmentStore := investstore.New(db.Pool)
+
+		// Read API keys from config
+		paystackSecretKey := os.Getenv("COINDISTRO_PAYSTACK_SECRET_KEY")
+		paystackPublicKey := os.Getenv("COINDISTRO_PAYSTACK_PUBLIC_KEY")
+		flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
+		flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
+		flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
+
+		investmentCfg := investservice.Config{
+			BaseURL:               cfg.App.BaseURL,
+			PaystackSecretKey:     paystackSecretKey,
+			PaystackPublicKey:     paystackPublicKey,
+			FlutterwaveSecretKey:  flutterwaveSecretKey,
+			FlutterwavePublicKey:  flutterwavePublicKey,
+			FlutterwaveSecretHash: flutterwaveSecretHash,
+		}
+
+		investmentSvc = investservice.New(
+			investmentStore,
+			eventBus,
+			jobRegistry,
+			workerPool,
+			nil, // auditLogger - will be wired when audit store is implemented
+			promMetrics,
+			log.Logger,
+			investmentCfg,
+		)
+
+		investmentHandlers = investhandlers.New(investmentSvc, log.Logger)
+		log.Info("investment service initialized")
+	}
+
 	// Create identity handlers
 	identityHandlers := handlers.New(identitySvc, log.Logger)
 
 	// Setup routes
-	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, nil, nil, nil)
+	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, nil, investmentHandlers, workerPool, sched)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -302,24 +344,26 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	return &Server{
-		cfg:          cfg,
-		logger:       log,
-		db:           db,
-		redis:        redis,
-		auth:         authService,
-		rbac:         rbacService,
-		eventBus:     eventBus,
-		workerPool:   workerPool,
-		jobRegistry:  jobRegistry,
-		sched:        sched,
-		featureFlags: ff,
-		promMetrics:  promMetrics,
-		tracer:       tracer,
-		emailSender:  emailSender,
-		storageProv:  storageProv,
-		identitySvc:  identitySvc,
-		engine:       engine,
-		http:         httpServer,
+		cfg:                cfg,
+		logger:             log,
+		db:                 db,
+		redis:              redis,
+		auth:               authService,
+		rbac:               rbacService,
+		eventBus:           eventBus,
+		workerPool:         workerPool,
+		jobRegistry:        jobRegistry,
+		sched:              sched,
+		featureFlags:       ff,
+		promMetrics:        promMetrics,
+		tracer:             tracer,
+		emailSender:        emailSender,
+		storageProv:        storageProv,
+		identitySvc:        identitySvc,
+		investmentSvc:      investmentSvc,
+		investmentHandlers: investmentHandlers,
+		engine:             engine,
+		http:               httpServer,
 	}, nil
 }
 
@@ -391,6 +435,19 @@ func (s *Server) Start() error {
 
 	// Start scheduler
 	if s.sched != nil {
+		// Register investment maturity check task (every 1 minute)
+		if s.investmentSvc != nil {
+			s.sched.AddTask(scheduler.Task{
+				ID:       "investment_maturity_check",
+				Name:     "Investment Maturity Check",
+				Interval: 1 * time.Minute,
+				Handler: func(ctx context.Context) error {
+					return s.investmentSvc.ProcessMaturedInvestments(ctx)
+				},
+			})
+			s.logger.Info("investment maturity check task registered")
+		}
+
 		s.sched.Start()
 	}
 
@@ -468,19 +525,21 @@ func (s *Server) Shutdown() error {
 }
 
 // Engine returns the Gin engine (useful for testing).
-func (s *Server) Engine() *gin.Engine                 { return s.engine }
-func (s *Server) Logger() *logger.Logger              { return s.logger }
-func (s *Server) Database() *database.Database        { return s.db }
-func (s *Server) Redis() *cache.Cache                 { return s.redis }
-func (s *Server) Auth() *auth.Auth                    { return s.auth }
-func (s *Server) RBAC() *rbac.RBAC                    { return s.rbac }
-func (s *Server) EventBus() *events.InMemoryBus       { return s.eventBus }
-func (s *Server) WorkerPool() *workers.Pool           { return s.workerPool }
-func (s *Server) JobRegistry() *workers.Registry      { return s.jobRegistry }
-func (s *Server) Scheduler() *scheduler.Scheduler     { return s.sched }
-func (s *Server) FeatureFlags() *featureflags.Manager { return s.featureFlags }
-func (s *Server) Metrics() *metrics.Metrics           { return s.promMetrics }
-func (s *Server) Tracer() *telemetry.TracerProvider   { return s.tracer }
-func (s *Server) EmailSender() email.Sender           { return s.emailSender }
-func (s *Server) Storage() storage.Provider           { return s.storageProv }
-func (s *Server) IdentityService() *idservice.Service { return s.identitySvc }
+func (s *Server) Engine() *gin.Engine                          { return s.engine }
+func (s *Server) Logger() *logger.Logger                       { return s.logger }
+func (s *Server) Database() *database.Database                 { return s.db }
+func (s *Server) Redis() *cache.Cache                          { return s.redis }
+func (s *Server) Auth() *auth.Auth                             { return s.auth }
+func (s *Server) RBAC() *rbac.RBAC                             { return s.rbac }
+func (s *Server) EventBus() *events.InMemoryBus                { return s.eventBus }
+func (s *Server) WorkerPool() *workers.Pool                    { return s.workerPool }
+func (s *Server) JobRegistry() *workers.Registry               { return s.jobRegistry }
+func (s *Server) Scheduler() *scheduler.Scheduler              { return s.sched }
+func (s *Server) FeatureFlags() *featureflags.Manager          { return s.featureFlags }
+func (s *Server) Metrics() *metrics.Metrics                    { return s.promMetrics }
+func (s *Server) Tracer() *telemetry.TracerProvider            { return s.tracer }
+func (s *Server) EmailSender() email.Sender                    { return s.emailSender }
+func (s *Server) Storage() storage.Provider                    { return s.storageProv }
+func (s *Server) IdentityService() *idservice.Service          { return s.identitySvc }
+func (s *Server) InvestmentService() *investservice.Service    { return s.investmentSvc }
+func (s *Server) InvestmentHandlers() *investhandlers.Handlers { return s.investmentHandlers }
