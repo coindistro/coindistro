@@ -118,33 +118,47 @@ Or start the full stack:
 docker compose up -d
 ```
 
-### 3. Bootstrap & Seed (development only)
+### 3. Bootstrap & Development Seed Accounts
 
-After Docker is healthy, initialize the platform and load demo data:
+After Docker is healthy, starting the API runs migrations, ensures a Super Admin, and (in development) seeds demo role accounts automatically.
 
 ```bash
 # From backend/
-go run ./scripts/bootstrap   # Genesis Super Admin only
-go run ./scripts/seed        # Full demo dataset
+make run
+# or
+go run ./cmd/api --config ./configs/config.yaml
 ```
 
-Or via Make:
+Optional CLI tools:
 
 ```bash
-make bootstrap
-make seed
+go run ./scripts/bootstrap   # Super Admin only
+go run ./scripts/seed        # Extended demo data (earn products, activity, etc.)
 ```
 
-**Safety:** Bootstrap and seed refuse to run unless the environment is `development` / `dev` / `local`
-(`COINDISTRO_ENV`, `APP_ENV`, or `ENV`). They never execute in production.
+#### Development Seed Accounts
 
-Default credentials after seed:
+Created idempotently when `COINDISTRO_SEED_DEMO_USERS=true` (default in non-production).
 
 | Role | Email | Password |
 |------|-------|----------|
-| Super Admin | `admin@coindistro.com` | `Admin@123456` |
-| Admin | `admin1@coindistro.com` | `Admin@123456` |
-| User | `user1@coindistro.com` | `User@123456` |
+| Super Admin | admin@coindistro.com | Admin123! |
+| Admin | platform@coindistro.com | Platform123! |
+| Moderator | moderator@coindistro.com | Moderator123! |
+| Merchant | merchant@coindistro.com | Merchant123! |
+| User | user@coindistro.com | User123! |
+| Genesis | genesis@coindistro.com | Genesis123! |
+
+Environment flags:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COINDISTRO_SEED_DEMO_USERS` | `true` (dev) | Enable/disable demo role accounts |
+| `COINDISTRO_ALLOW_PRODUCTION_DEMO_USERS` | `false` | Required to seed demo users in production |
+| `FORCE_SEED_PASSWORDS` | `false` | When true, re-hash seed passwords on existing users |
+| `COINDISTRO_SUPER_ADMIN_PASSWORD` | `Admin123!` | Override Super Admin password on first create |
+
+**Safety:** Demo users are **never** created in production unless `COINDISTRO_ALLOW_PRODUCTION_DEMO_USERS=true`.
 
 Then open the web app at `http://localhost:3000` (with the API at `http://localhost:8080`).
 

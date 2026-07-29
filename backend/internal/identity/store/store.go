@@ -55,28 +55,70 @@ func (s *Store) CreateUserFull(ctx context.Context, user *models.User) error {
 		INSERT INTO identity_users (
 			id, username, email, password_hash, display_name, avatar_url,
 			country, timezone, locale, referral_code, referred_by, referral_level,
-			status, email_verified_at,
+			status, email_verified_at, phone_verified_at,
 			is_genesis, genesis_number, genesis_date, is_founder, founder_badge,
 			last_login_at, last_login_ip, last_login_user_agent,
 			roles, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10, $11, $12,
-			$13, $14,
-			$15, $16, $17, $18, $19,
-			$20, $21, $22,
-			$23, $24, $25
+			$13, $14, $15,
+			$16, $17, $18, $19, $20,
+			$21, $22, $23,
+			$24, $25, $26
 		)`
 
 	_, err := s.pool.Exec(ctx, query,
 		user.ID, user.Username, user.Email, user.PasswordHash, user.DisplayName, user.AvatarURL,
 		user.Country, user.Timezone, user.Locale, user.ReferralCode, user.ReferredBy, user.ReferralLevel,
-		user.Status, user.EmailVerifiedAt,
+		user.Status, user.EmailVerifiedAt, user.PhoneVerifiedAt,
 		user.IsGenesis, user.GenesisNumber, user.GenesisDate, user.IsFounder, user.FounderBadge,
 		user.LastLoginAt, user.LastLoginIP, user.LastLoginUserAgent,
 		user.Roles, now, now,
 	)
 	return err
+}
+
+// ApplySeedProfile updates profile, verification, genesis, and roles for an existing user.
+// Does not change password (use UpdatePassword for that).
+func (s *Store) ApplySeedProfile(ctx context.Context, user *models.User) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE identity_users SET
+			username = $2,
+			display_name = $3,
+			country = $4,
+			timezone = $5,
+			referral_code = $6,
+			status = $7,
+			email_verified_at = $8,
+			phone_verified_at = $9,
+			is_genesis = $10,
+			genesis_number = $11,
+			genesis_date = $12,
+			is_founder = $13,
+			founder_badge = $14,
+			roles = $15,
+			updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL`,
+		user.ID, user.Username, user.DisplayName, user.Country, user.Timezone,
+		user.ReferralCode, user.Status, user.EmailVerifiedAt, user.PhoneVerifiedAt,
+		user.IsGenesis, user.GenesisNumber, user.GenesisDate, user.IsFounder, user.FounderBadge,
+		user.Roles,
+	)
+	return err
+}
+
+// IsReferralCodeTaken reports whether a referral code is already in use (optionally excluding a user).
+func (s *Store) IsReferralCodeTaken(ctx context.Context, code, excludeUserID string) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM identity_users
+			WHERE referral_code = $1 AND deleted_at IS NULL
+			  AND ($2 = '' OR id <> $2)
+		)`, code, excludeUserID,
+	).Scan(&exists)
+	return exists, err
 }
 
 // CountUsersWithRole counts users that have the given role in their roles array.

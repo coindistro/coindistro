@@ -28,6 +28,7 @@ import (
 	"github.com/coindistro/backend/internal/rbac"
 	"github.com/coindistro/backend/internal/routes"
 	"github.com/coindistro/backend/internal/scheduler"
+	"github.com/coindistro/backend/internal/seed"
 	"github.com/coindistro/backend/internal/storage"
 	"github.com/coindistro/backend/internal/telemetry"
 	"github.com/coindistro/backend/internal/workers"
@@ -244,6 +245,18 @@ func New(cfg *config.Config) (*Server, error) {
 			log.Info("super admin bootstrap",
 				zap.Bool("already_completed", result.AlreadyCompleted),
 				zap.String("message", result.Message),
+			)
+		}
+
+		// Development demo accounts (idempotent). Disabled in production unless explicitly allowed.
+		if seed.ShouldSeedDemoUsers(cfg) {
+			log.Info("seeding development demo accounts")
+			if err := seed.SeedDemoAccounts(context.Background(), db, log.Logger); err != nil {
+				log.Warn("demo account seed failed", zap.Error(err))
+			}
+		} else {
+			log.Info("demo account seed skipped",
+				zap.String("environment", cfg.App.Environment),
 			)
 		}
 	}
