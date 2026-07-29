@@ -78,11 +78,30 @@ func (m *Manager) Disable(name string) error {
 }
 
 // Set sets a feature flag's enabled state.
+// If the flag does not exist yet, it is registered (never fails for unknown names).
 func (m *Manager) Set(name string, enabled bool) error {
-	if enabled {
-		return m.Enable(name)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if flag, ok := m.flags[name]; ok {
+		flag.Enabled = enabled
+		m.logger.Info("feature flag set",
+			zap.String("flag", name),
+			zap.Bool("enabled", enabled),
+		)
+		return nil
 	}
-	return m.Disable(name)
+
+	m.flags[name] = &Flag{
+		Name:        name,
+		Enabled:     enabled,
+		Environment: m.environment,
+	}
+	m.logger.Info("feature flag registered and set",
+		zap.String("flag", name),
+		zap.Bool("enabled", enabled),
+	)
+	return nil
 }
 
 // GetFlag returns a feature flag by name.

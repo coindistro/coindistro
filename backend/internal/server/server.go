@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -69,10 +70,14 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
+	buildVersion, buildCommit, buildDate := readBuildInfo(cfg.App.Version)
 	log.Info("initializing server",
 		zap.String("app", cfg.App.Name),
 		zap.String("version", cfg.App.Version),
 		zap.String("environment", cfg.App.Environment),
+		zap.String("build_version", buildVersion),
+		zap.String("git_commit", buildCommit),
+		zap.String("build_date", buildDate),
 	)
 
 	// Initialize database
@@ -131,9 +136,18 @@ func New(cfg *config.Config) (*Server, error) {
 		ff.LoadFromConfig(context.Background(), cfg.FeatureFlags.Flags)
 	}
 	// Explicit registration config / COINDISTRO_REGISTRATION_ENABLED always wins.
-	_ = ff.Set(featureflags.FlagRegistration, cfg.Registration.Enabled)
-	_ = ff.Set(featureflags.FlagInviteOnly, cfg.Registration.InviteOnly)
-	log.Info("feature flags initialized", zap.Int("flags", len(ff.GetAllFlags())))
+	if err := ff.Set(featureflags.FlagRegistration, cfg.Registration.Enabled); err != nil {
+		log.Warn("failed to set registration.enabled flag", zap.Error(err))
+	}
+	if err := ff.Set(featureflags.FlagInviteOnly, cfg.Registration.InviteOnly); err != nil {
+		log.Warn("failed to set registration.invite_only flag", zap.Error(err))
+	}
+	log.Info("feature flags initialized",
+		zap.Int("flags", len(ff.GetAllFlags())),
+		zap.Bool("flag_registration", ff.IsEnabled(featureflags.FlagRegistration)),
+		zap.Bool("flag_invite_only", ff.IsEnabled(featureflags.FlagInviteOnly)),
+		zap.Bool("flag_requires_referral", ff.IsEnabled(featureflags.FlagRequiresReferral)),
+	)
 	log.Info(fmt.Sprintf("Registration enabled: %t", cfg.Registration.Enabled))
 	log.Info(fmt.Sprintf("Invite only mode: %t", cfg.Registration.InviteOnly))
 
@@ -222,6 +236,9 @@ func New(cfg *config.Config) (*Server, error) {
 	if db != nil && db.Pool != nil {
 		identityStore := store.New(db.Pool)
 		identityCfg := idservice.DefaultConfig()
+		// Wire COINDISTRO_REGISTRATION_ENABLED into the identity service (source of truth).
+		identityCfg.RegistrationEnabled = cfg.Registration.Enabled
+		identityCfg.InviteOnly = cfg.Registration.InviteOnly
 		identitySvc = idservice.New(
 			identityStore,
 			authService,
@@ -236,7 +253,10 @@ func New(cfg *config.Config) (*Server, error) {
 			log.Logger,
 			identityCfg,
 		)
-		log.Info("identity service initialized")
+		log.Info("identity service initialized",
+			zap.Bool("registration_enabled", identityCfg.RegistrationEnabled),
+			zap.Bool("invite_only", identityCfg.InviteOnly),
+		)
 
 		// Ensure platform super admin exists (idempotent; safe in production).
 		if result, err := bootstrap.EnsureSuperAdmin(context.Background(), bootstrap.Dependencies{
@@ -308,6 +328,48 @@ func envStatus(value string) string {
 		return "missing"
 	}
 	return "present"
+}
+
+// readBuildInfo returns version, git commit, and build date for startup diagnostics.
+// Commit/date come from Go module build info (vcs.revision / vcs.time) when available.
+func readBuildInfo(appVersion string) (version, commit, buildDate string) {
+	version = appVersion
+	if version == "" {
+		version = "unknown"
+	}
+	commit = "unknown"
+	buildDate = "unknown"
+
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			version = bi.Main.Version
+		}
+		for _, s := range bi.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				if len(s.Value) > 12 {
+					commit = s.Value[:12]
+				} else if s.Value != "" {
+					commit = s.Value
+				}
+			case "vcs.time":
+				if s.Value != "" {
+					buildDate = s.Value
+				}
+			}
+		}
+	}
+	// Allow CI/CD to inject explicit values without ldflags complexity.
+	if v := os.Getenv("COINDISTRO_BUILD_VERSION"); v != "" {
+		version = v
+	}
+	if v := os.Getenv("COINDISTRO_GIT_COMMIT"); v != "" {
+		commit = v
+	}
+	if v := os.Getenv("COINDISTRO_BUILD_DATE"); v != "" {
+		buildDate = v
+	}
+	return version, commit, buildDate
 }
 
 // Start starts the HTTP server and all background services.

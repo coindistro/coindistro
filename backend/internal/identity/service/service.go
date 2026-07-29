@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -57,6 +59,13 @@ type Config struct {
 	ResetCooldown            time.Duration
 	DefaultInvitationCredits int
 	GenesisMaxNumber         int
+	// RegistrationEnabled is the source of truth for public signup
+	// (from COINDISTRO_REGISTRATION_ENABLED, default true).
+	RegistrationEnabled bool
+	// InviteOnly restricts open registration when true.
+	InviteOnly bool
+	// RequiresReferral requires a referral code when true.
+	RequiresReferral bool
 }
 
 // DefaultConfig returns default configuration for the identity service.
@@ -75,6 +84,9 @@ func DefaultConfig() Config {
 		ResetCooldown:            60 * time.Second,
 		DefaultInvitationCredits: 5,
 		GenesisMaxNumber:         10000,
+		RegistrationEnabled:      true,
+		InviteOnly:               false,
+		RequiresReferral:         false,
 	}
 }
 
@@ -147,8 +159,12 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest, ip,
 		timezone = "UTC"
 	}
 	status := "active"
-	autoVerify := s.featureFlags.IsEnabled(featureflags.FlagAutoVerify)
-	emailVerification := s.featureFlags.IsEnabled(featureflags.FlagEmailVerification)
+	autoVerify := true
+	emailVerification := false
+	if s.featureFlags != nil {
+		autoVerify = s.featureFlags.IsEnabled(featureflags.FlagAutoVerify)
+		emailVerification = s.featureFlags.IsEnabled(featureflags.FlagEmailVerification)
+	}
 	if emailVerification && !autoVerify {
 		status = "pending"
 	}
@@ -192,7 +208,11 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest, ip,
 		_ = s.store.AcceptInvitation(ctx, invitation.ID, user.ID)
 		_ = s.store.DeductInvitationCredit(ctx, invitation.InviterID)
 	}
-	if !s.featureFlags.IsEnabled(featureflags.FlagInviteOnly) {
+	inviteOnly := s.cfg.InviteOnly
+	if s.featureFlags != nil {
+		inviteOnly = inviteOnly || s.featureFlags.IsEnabled(featureflags.FlagInviteOnly)
+	}
+	if !inviteOnly {
 		credits := &models.InvitationCredit{
 			ID:           uuidlib.NewString(),
 			UserID:       user.ID,
@@ -1218,16 +1238,73 @@ func (s *Service) LogDemoActivityAt(ctx context.Context, userID, action, ip, use
 
 // ─── Internal helpers ─────────────────────────────────
 
-// checkRegistrationAccess enforces registration feature flags.
+// checkRegistrationAccess enforces registration availability.
+//
+// Source of truth (in order):
+//  1. Service config (COINDISTRO_REGISTRATION_ENABLED / registration.enabled) — defaults true
+//  2. Feature flags, when present (mirrors config at startup; may be toggled at runtime)
+//
 // When disabled, returns ErrRegistrationDisabled (HTTP 403 / REGISTRATION_DISABLED).
+// A nil feature-flag manager no longer disables registration by itself.
 func (s *Service) checkRegistrationAccess(referralCode string) error {
-	if s.featureFlags == nil || !s.featureFlags.IsEnabled(featureflags.FlagRegistration) {
+	cfgEnabled := s.cfg.RegistrationEnabled
+	cfgInviteOnly := s.cfg.InviteOnly
+	cfgRequiresReferral := s.cfg.RequiresReferral
+
+	flagRegistration := cfgEnabled
+	flagInviteOnly := cfgInviteOnly
+	flagRequiresReferral := cfgRequiresReferral
+	if s.featureFlags != nil {
+		flagRegistration = s.featureFlags.IsEnabled(featureflags.FlagRegistration)
+		flagInviteOnly = s.featureFlags.IsEnabled(featureflags.FlagInviteOnly)
+		flagRequiresReferral = s.featureFlags.IsEnabled(featureflags.FlagRequiresReferral)
+	}
+
+	// Registration is allowed when config OR flags allow it when both are present.
+	// Prefer the stricter of the two when flags exist: both must permit registration.
+	// Config alone is enough when featureFlags is nil.
+	registrationOn := cfgEnabled
+	inviteOnly := cfgInviteOnly
+	requiresReferral := cfgRequiresReferral
+	if s.featureFlags != nil {
+		// Both config and flag must be on — prevents stale flag maps from blocking
+		// when config is true AND keeps runtime flag toggles effective.
+		// If flag defaults are missing (legacy bug), IsEnabled is false and would
+		// wrongly block; fall back to config when flag is unknown.
+		if _, err := s.featureFlags.GetFlag(featureflags.FlagRegistration); err == nil {
+			registrationOn = cfgEnabled && flagRegistration
+		} else {
+			registrationOn = cfgEnabled
+		}
+		if _, err := s.featureFlags.GetFlag(featureflags.FlagInviteOnly); err == nil {
+			inviteOnly = cfgInviteOnly || flagInviteOnly
+		}
+		if _, err := s.featureFlags.GetFlag(featureflags.FlagRequiresReferral); err == nil {
+			requiresReferral = cfgRequiresReferral || flagRequiresReferral
+		}
+	}
+
+	if s.logger != nil {
+		s.logger.Info("registration access check",
+			zap.Bool("registration_enabled", cfgEnabled),
+			zap.Bool("invite_only", cfgInviteOnly),
+			zap.Bool("flag_registration", flagRegistration),
+			zap.Bool("flag_invite_only", flagInviteOnly),
+			zap.Bool("flag_requires_referral", flagRequiresReferral),
+			zap.Bool("effective_registration_on", registrationOn),
+			zap.Bool("effective_invite_only", inviteOnly),
+			zap.Bool("effective_requires_referral", requiresReferral),
+			zap.Bool("has_feature_flags", s.featureFlags != nil),
+		)
+	}
+
+	if !registrationOn {
 		return ide.ErrRegistrationDisabled
 	}
-	if s.featureFlags.IsEnabled(featureflags.FlagInviteOnly) {
+	if inviteOnly {
 		return ide.ErrInviteOnly
 	}
-	if s.featureFlags.IsEnabled(featureflags.FlagRequiresReferral) && referralCode == "" {
+	if requiresReferral && referralCode == "" {
 		return ide.ErrReferralRequired
 	}
 	return nil
@@ -1342,8 +1419,12 @@ func (s *Service) buildSession(ctx context.Context, userID, refreshToken, ip, us
 	}
 }
 
+// hashToken returns a SHA-256 hex digest of token (64 chars).
+// Previously this hex-encoded the raw JWT (~2× JWT length), which overflowed
+// sessions.refresh_token_hash VARCHAR(255).
 func (s *Service) hashToken(token string) string {
-	return fmt.Sprintf("%x", []byte(token))
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) sendVerificationEmail(ctx context.Context, userID, emailAddr string) {
@@ -1384,7 +1465,8 @@ func (s *Service) audit(ctx context.Context, action audit.Action, entityType aud
 }
 
 func (s *Service) checkGenesisAward(ctx context.Context, user *models.User) {
-	if !s.featureFlags.IsEnabled(featureflags.FlagGenesis) {
+	// Require genesis flag when the manager is present; skip award if flags are unavailable.
+	if s.featureFlags == nil || !s.featureFlags.IsEnabled(featureflags.FlagGenesis) {
 		return
 	}
 	genesisConfig, err := s.store.GetGenesisConfig(ctx)

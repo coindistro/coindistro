@@ -198,10 +198,55 @@ func TestResolveReferral_ValidInvitation(t *testing.T) {
 
 func TestCheckRegistrationAccess_InviteOnly(t *testing.T) {
 	ff := testFlags(t, true, true)
-	svc := New(nil, nil, nil, nil, nil, nil, nil, ff, nil, nil, zap.NewNop(), DefaultConfig())
+	cfg := DefaultConfig()
+	cfg.RegistrationEnabled = true
+	cfg.InviteOnly = true
+	svc := New(nil, nil, nil, nil, nil, nil, nil, ff, nil, nil, zap.NewNop(), cfg)
 	err := svc.checkRegistrationAccess("CODE")
 	appErr := apperrors.GetAppError(err)
 	if appErr == nil || appErr.Code != "INVITE_ONLY" {
 		t.Fatalf("got %v, want INVITE_ONLY", err)
+	}
+}
+
+func TestCheckRegistrationAccess_ConfigEnabledWithoutFlags(t *testing.T) {
+	// Nil feature-flag manager must NOT disable registration when config is enabled.
+	cfg := DefaultConfig()
+	cfg.RegistrationEnabled = true
+	svc := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop(), cfg)
+	if err := svc.checkRegistrationAccess("CODE"); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+}
+
+func TestCheckRegistrationAccess_ConfigDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.RegistrationEnabled = false
+	svc := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop(), cfg)
+	err := svc.checkRegistrationAccess("CODE")
+	appErr := apperrors.GetAppError(err)
+	if appErr == nil || appErr.Code != "REGISTRATION_DISABLED" {
+		t.Fatalf("got %v, want REGISTRATION_DISABLED", err)
+	}
+}
+
+func TestHashToken_IsSHA256Hex(t *testing.T) {
+	svc := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop(), DefaultConfig())
+	// Long JWT-like token that overflowed VARCHAR(255) when hex-encoded (2× length).
+	b := make([]byte, 600)
+	for i := range b {
+		b[i] = 'A' + byte(i%26)
+	}
+	token := string(b)
+
+	hash := svc.hashToken(token)
+	if len(hash) != 64 {
+		t.Fatalf("sha256 hex length = %d, want 64 (was overflowing VARCHAR(255) with hex(JWT))", len(hash))
+	}
+	if len(hash) == len(token)*2 {
+		t.Fatal("hashToken still appears to hex-encode raw token instead of hashing")
+	}
+	if svc.hashToken(token) != hash {
+		t.Fatal("hashToken not deterministic")
 	}
 }

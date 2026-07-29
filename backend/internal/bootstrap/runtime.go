@@ -75,25 +75,27 @@ func NewRuntime(configPath string) (*Runtime, error) {
 	rbacService := rbac.New()
 	eventBus := events.NewInMemoryBus(log.Logger)
 	ff := featureflags.New(log.Logger, cfg.App.Environment)
-	// Ensure registration/identity flags are usable for seed-related paths.
+	// Align bootstrap flags with production API defaults + COINDISTRO_REGISTRATION_*.
+	_ = ff.Set(featureflags.FlagRegistration, cfg.Registration.Enabled)
+	_ = ff.Set(featureflags.FlagInviteOnly, cfg.Registration.InviteOnly)
+	_ = ff.Set(featureflags.FlagRequiresReferral, false)
+	_ = ff.Set(featureflags.FlagEmailVerification, false)
+	_ = ff.Set(featureflags.FlagAutoVerify, true)
+	_ = ff.Set(featureflags.FlagGenesis, true)
 	ff.LoadFromConfig(context.Background(), map[string]bool{
-		featureflags.FlagRegistration:      true,
-		featureflags.FlagRequiresReferral:  false,
-		featureflags.FlagInviteOnly:        false,
-		featureflags.FlagEmailVerification: false,
-		featureflags.FlagAutoVerify:        true,
-		featureflags.FlagGenesis:           true,
-		featureflags.FlagEarn:              true,
-		featureflags.FlagEarnFlexible:      true,
-		featureflags.FlagEarnFixed:         true,
-		featureflags.FlagEarnStablecoin:    true,
-		featureflags.FlagEarnAI:            true,
-		featureflags.FlagEarnSignalVault:   true,
+		featureflags.FlagEarn:            true,
+		featureflags.FlagEarnFlexible:    true,
+		featureflags.FlagEarnFixed:       true,
+		featureflags.FlagEarnStablecoin:  true,
+		featureflags.FlagEarnAI:          true,
+		featureflags.FlagEarnSignalVault: true,
 	})
 
 	emailSender := email.NewNoopSender(log.Logger)
 	identityStore := store.New(db.Pool)
 	identityCfg := idservice.DefaultConfig()
+	identityCfg.RegistrationEnabled = cfg.Registration.Enabled
+	identityCfg.InviteOnly = cfg.Registration.InviteOnly
 	identitySvc := idservice.New(
 		identityStore,
 		authService,
