@@ -1,51 +1,82 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Menu, X, Sun, Moon } from 'lucide-react';
-import { useTheme } from '@coindistro/cds';
+import { useState, useEffect, useId } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Menu, X, Sun, Moon, LogOut, LayoutDashboard, Settings, User } from "lucide-react";
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  useTheme,
+  cn,
+} from "@coindistro/cds";
+import { useAuth } from "@/features/authentication/auth-provider";
+import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 
 const navLinks = [
-  { name: 'Products', href: '/#ecosystem' },
-  { name: 'Markets', href: '/#market' },
-  { name: 'Signals', href: '/#signals' },
-  { name: 'Academy', href: '/academy' },
-  { name: 'Security', href: '/#security' },
-  { name: 'Roadmap', href: '/#roadmap' },
+  { name: "Products", href: "/#ecosystem" },
+  { name: "Markets", href: "/#market" },
+  { name: "Signals", href: "/#signals" },
+  { name: "Academy", href: "/academy" },
+  { name: "Security", href: "/#security" },
+  { name: "Roadmap", href: "/#roadmap" },
 ];
+
+function userInitials(displayName?: string | null, email?: string | null): string {
+  const source = (displayName || email || "U").trim();
+  return source.slice(0, 2).toUpperCase();
+}
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  const { user, isAuthenticated, loading, logout } = useAuth();
+  const pathname = usePathname();
+  const drawerId = useId();
+  const drawerDomId = `mobile-nav-${drawerId.replace(/:/g, "")}`;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const isDark = resolvedTheme === 'dark';
-  const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
+  // Close drawer on route change (safety net for Link navigations).
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  const isDark = resolvedTheme === "dark";
+  const toggleTheme = () => setTheme(isDark ? "light" : "dark");
+
+  const showGuestActions = !loading && !isAuthenticated;
+  const showUserMenu = !loading && isAuthenticated;
 
   return (
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled 
-          ? 'glass py-3 shadow-lg' 
-          : 'bg-transparent py-5'
-      }`}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        scrolled ? "glass py-3 shadow-lg" : "bg-transparent py-5",
+      )}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-3">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
-            <div className="relative w-8 h-8">
+          <Link href="/" className="flex min-w-0 items-center gap-2">
+            <div className="relative h-8 w-8 shrink-0">
               <Image
                 src="/coindistro-logo.png"
                 alt="Coindistro Logo"
@@ -54,29 +85,29 @@ export default function Navbar() {
                 priority
               />
             </div>
-            <span className="text-xl font-bold gradient-text">Coindistro</span>
-          </a>
+            <span className="truncate text-xl font-bold gradient-text">Coindistro</span>
+          </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden items-center gap-1 md:flex">
             {navLinks.map((link) => (
               <a
                 key={link.name}
                 href={link.href}
-                className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-200 rounded-lg hover:bg-white/5"
+                className="rounded-lg px-4 py-2 text-sm text-[var(--text-muted)] transition-colors duration-200 hover:bg-white/5 hover:text-[var(--text-primary)]"
               >
                 {link.name}
               </a>
             ))}
           </div>
 
-          {/* Right side: Theme toggle + CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Theme Toggle */}
+          {/* Desktop: Theme + auth CTAs / avatar */}
+          <div className="hidden items-center gap-3 md:flex">
             <button
+              type="button"
               onClick={toggleTheme}
-              className="relative p-2.5 rounded-lg glass hover:bg-[var(--card-bg)]/50 transition-all duration-300 group"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="group relative rounded-lg p-2.5 glass transition-all duration-300 hover:bg-[var(--card-bg)]/50"
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               <AnimatePresence mode="wait" initial={false}>
                 {isDark ? (
@@ -87,7 +118,7 @@ export default function Navbar() {
                     exit={{ scale: 0, rotate: 180 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <Sun className="w-5 h-5 text-yellow-400" />
+                    <Sun className="h-5 w-5 text-yellow-400" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -97,80 +128,129 @@ export default function Navbar() {
                     exit={{ scale: 0, rotate: -180 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <Moon className="w-5 h-5 text-[#7C3AED]" />
+                    <Moon className="h-5 w-5 text-[#7C3AED]" />
                   </motion.div>
                 )}
               </AnimatePresence>
             </button>
 
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/register"
-              className="px-5 py-2.5 text-sm font-medium text-[var(--text-primary)] bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-lg hover:opacity-90 transition-all duration-200 glow-purple"
-            >
-              Get Started
-            </Link>
+            {showGuestActions && (
+              <>
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/register"
+                  className="glow-purple rounded-lg bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] px-5 py-2.5 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 hover:opacity-90"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
+
+            {showUserMenu && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Account menu"
+                    className="inline-flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <Avatar className="h-9 w-9 border border-border">
+                      <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                        {userInitials(user?.display_name, user?.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {user?.display_name || "Account"}
+                      </p>
+                      <p className="truncate text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/dashboard" className="cursor-pointer">
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onSelect={() => {
+                      void logout();
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
-          {/* Mobile: Theme toggle + hamburger */}
-          <div className="flex items-center gap-2 md:hidden">
+          {/* Mobile: Theme + hamburger */}
+          <div className="flex items-center gap-1 sm:gap-2 md:hidden">
             <button
+              type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-lg glass"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="rounded-lg p-2 glass"
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
               {isDark ? (
-                <Sun className="w-5 h-5 text-yellow-400" />
+                <Sun className="h-5 w-5 text-yellow-400" />
               ) : (
-                <Moon className="w-5 h-5 text-[#7C3AED]" />
+                <Moon className="h-5 w-5 text-[#7C3AED]" />
               )}
             </button>
-            
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 text-[var(--text-primary)]"
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-[var(--text-primary)]"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={menuOpen}
+              aria-controls={drawerDomId}
             >
-              {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+              {menuOpen ? <X className="h-6 w-6" aria-hidden /> : <Menu className="h-6 w-6" aria-hidden />}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden glass mt-2 mx-4 rounded-xl overflow-hidden"
-          >
-            <div className="p-4 space-y-2">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="block px-4 py-3 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-white/5"
-                >
-                  {link.name}
-                </a>
-              ))}
-              <a
-                href="#"
-                className="block w-full text-center px-5 py-3 text-sm font-medium text-[var(--text-primary)] bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] rounded-lg mt-4"
-              >
-                Get Started
-              </a>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MobileNavDrawer
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        navLinks={navLinks}
+        isAuthenticated={isAuthenticated}
+        authLoading={loading}
+        onLogout={logout}
+        drawerId={drawerDomId}
+      />
     </motion.nav>
   );
 }
