@@ -15,7 +15,7 @@ var (
 	ErrReferralAlreadyUsed  = apperrors.New("REFERRAL_ALREADY_USED", "This referral code has already been used", http.StatusConflict)
 	ErrEmailAlreadyExists   = apperrors.New("EMAIL_ALREADY_EXISTS", "An account with this email already exists", http.StatusConflict)
 	ErrUsernameTaken        = apperrors.New("USERNAME_TAKEN", "This username is already taken", http.StatusConflict)
-	ErrRegistrationDisabled = apperrors.New("REGISTRATION_DISABLED", "Registration is currently disabled", http.StatusServiceUnavailable)
+	ErrRegistrationDisabled = apperrors.New("REGISTRATION_DISABLED", "Registration is currently disabled", http.StatusForbidden)
 	ErrInviteOnly           = apperrors.New("INVITE_ONLY", "Coindistro is currently invite-only. You need an invitation code to register.", http.StatusForbidden)
 	ErrNoInvitationCredits  = apperrors.New("NO_INVITATION_CREDITS", "You have no invitation credits remaining", http.StatusForbidden)
 

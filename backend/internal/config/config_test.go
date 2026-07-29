@@ -284,3 +284,58 @@ auth:
 		t.Fatalf("refresh default = %v, want 10080m", cfg.Auth.RefreshTokenTTL)
 	}
 }
+
+func TestLoad_RegistrationEnabledDefault(t *testing.T) {
+	_ = os.Unsetenv("COINDISTRO_REGISTRATION_ENABLED")
+	_ = os.Unsetenv("COINDISTRO_INVITE_ONLY")
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if !cfg.Registration.Enabled {
+		t.Fatal("registration.enabled should default to true")
+	}
+	if cfg.Registration.InviteOnly {
+		t.Fatal("registration.invite_only should default to false")
+	}
+}
+
+func TestLoad_RegistrationEnabledFromEnv(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+registration:
+  enabled: true
+  invite_only: false
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("COINDISTRO_REGISTRATION_ENABLED", "false")
+	t.Setenv("COINDISTRO_INVITE_ONLY", "true")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Registration.Enabled {
+		t.Fatal("COINDISTRO_REGISTRATION_ENABLED=false should disable registration")
+	}
+	if !cfg.Registration.InviteOnly {
+		t.Fatal("COINDISTRO_INVITE_ONLY=true should enable invite-only mode")
+	}
+}

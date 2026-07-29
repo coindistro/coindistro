@@ -108,6 +108,13 @@ feature_flags:
   enabled: true
   flags: {}
 
+# ─── Public Registration / Onboarding ─────────────────
+# COINDISTRO_REGISTRATION_ENABLED=true|false (default true)
+# COINDISTRO_INVITE_ONLY=true|false (default false)
+registration:
+  enabled: true
+  invite_only: false
+
 # ─── Workers ──────────────────────────────────────────
 workers:
   enabled: true

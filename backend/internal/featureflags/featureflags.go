@@ -169,6 +169,15 @@ func (m *Manager) registerDefaultFlags() {
 		{Name: "audit_logging.enabled", Description: "Enable audit logging", Enabled: true},
 		{Name: "analytics.enabled", Description: "Enable analytics and reporting", Enabled: true},
 		{Name: "maintenance_mode", Description: "Put platform in maintenance mode", Enabled: false},
+
+		// Identity / public onboarding — registration is open by default.
+		{Name: FlagRegistration, Description: "Allow public user registration", Enabled: true},
+		{Name: FlagRequiresReferral, Description: "Require a referral code to register", Enabled: false},
+		{Name: FlagInviteOnly, Description: "Restrict registration to invite-only mode", Enabled: false},
+		{Name: FlagEmailVerification, Description: "Require email verification after registration", Enabled: false},
+		{Name: FlagAutoVerify, Description: "Automatically verify emails on registration", Enabled: true},
+		{Name: FlagSocialLogin, Description: "Allow social login providers", Enabled: false},
+		{Name: FlagGenesis, Description: "Enable genesis member awards", Enabled: true},
 	}
 
 	for _, flag := range defaultFlags {

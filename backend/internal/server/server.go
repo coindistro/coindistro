@@ -125,12 +125,17 @@ func New(cfg *config.Config) (*Server, error) {
 	eventBus := events.NewInMemoryBus(log.Logger)
 	log.Info("event bus initialized")
 
-	// Initialize feature flags
+	// Initialize feature flags (registration defaults to enabled for public onboarding).
 	ff := featureflags.New(log.Logger, cfg.App.Environment)
 	if cfg.FeatureFlags.Enabled && len(cfg.FeatureFlags.Flags) > 0 {
 		ff.LoadFromConfig(context.Background(), cfg.FeatureFlags.Flags)
 	}
+	// Explicit registration config / COINDISTRO_REGISTRATION_ENABLED always wins.
+	_ = ff.Set(featureflags.FlagRegistration, cfg.Registration.Enabled)
+	_ = ff.Set(featureflags.FlagInviteOnly, cfg.Registration.InviteOnly)
 	log.Info("feature flags initialized", zap.Int("flags", len(ff.GetAllFlags())))
+	log.Info(fmt.Sprintf("Registration enabled: %t", cfg.Registration.Enabled))
+	log.Info(fmt.Sprintf("Invite only mode: %t", cfg.Registration.InviteOnly))
 
 	// Initialize Prometheus metrics
 	var promMetrics *metrics.Metrics

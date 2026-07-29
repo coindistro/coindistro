@@ -26,10 +26,21 @@ type Config struct {
 	Telemetry    TelemetryConfig    `mapstructure:"telemetry"`
 	Email        EmailConfig        `mapstructure:"email"`
 	Storage      StorageConfig      `mapstructure:"storage"`
-	FeatureFlags FeatureFlagsConfig `mapstructure:"feature_flags"`
-	Workers      WorkersConfig      `mapstructure:"workers"`
-	Scheduler    SchedulerConfig    `mapstructure:"scheduler"`
-	Monitoring   MonitoringConfig   `mapstructure:"monitoring"`
+	FeatureFlags  FeatureFlagsConfig  `mapstructure:"feature_flags"`
+	Registration  RegistrationConfig  `mapstructure:"registration"`
+	Workers       WorkersConfig       `mapstructure:"workers"`
+	Scheduler     SchedulerConfig     `mapstructure:"scheduler"`
+	Monitoring    MonitoringConfig    `mapstructure:"monitoring"`
+}
+
+// RegistrationConfig controls public onboarding / signup availability.
+type RegistrationConfig struct {
+	// Enabled allows POST /auth/register when true (default true).
+	// Env: COINDISTRO_REGISTRATION_ENABLED
+	Enabled bool `mapstructure:"enabled"`
+	// InviteOnly rejects open registration when true.
+	// Env: COINDISTRO_INVITE_ONLY
+	InviteOnly bool `mapstructure:"invite_only"`
 }
 
 // AppConfig holds application-level configuration.
@@ -459,6 +470,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("feature_flags.enabled", true)
 	v.SetDefault("feature_flags.flags", map[string]bool{})
 
+	// Public registration / onboarding (default: open registration)
+	v.SetDefault("registration.enabled", true)
+	v.SetDefault("registration.invite_only", false)
+
 	// Workers defaults
 	v.SetDefault("workers.enabled", true)
 	v.SetDefault("workers.num_workers", 5)
@@ -504,6 +519,8 @@ func bindEnvKeys(v *viper.Viper) {
 		"storage.provider":              "COINDISTRO_STORAGE_PROVIDER",
 		"storage.base_path":             "COINDISTRO_STORAGE_PATH",
 		"monitoring.prometheus_enabled": "COINDISTRO_METRICS_ENABLED",
+		"registration.enabled":          "COINDISTRO_REGISTRATION_ENABLED",
+		"registration.invite_only":      "COINDISTRO_INVITE_ONLY",
 	}
 
 	for key, env := range envKeys {

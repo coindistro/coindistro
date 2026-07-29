@@ -111,22 +111,15 @@ func New(
 
 // Register creates a new user account with referral validation.
 func (s *Service) Register(ctx context.Context, req *models.RegisterRequest, ip, userAgent string) (*models.AuthResponse, error) {
-	if !s.featureFlags.IsEnabled(featureflags.FlagRegistration) {
-		return nil, ide.ErrRegistrationDisabled
+	if err := s.checkRegistrationAccess(req.ReferralCode); err != nil {
+		return nil, err
 	}
-	if s.featureFlags.IsEnabled(featureflags.FlagInviteOnly) {
-		return nil, ide.ErrInviteOnly
-	}
-	if s.featureFlags.IsEnabled(featureflags.FlagRequiresReferral) && req.ReferralCode == "" {
-		return nil, ide.ErrReferralRequired
-	}
-
-	exists, err := s.store.IsEmailTaken(ctx, req.Email)
-	if err != nil {
+	if s.store == nil {
 		return nil, apperrors.ErrInternalServer
 	}
-	if exists {
-		return nil, ide.ErrEmailAlreadyExists
+
+	if err := ensureEmailAvailable(ctx, s.store, req.Email); err != nil {
+		return nil, err
 	}
 	if req.Username != "" {
 		taken, err := s.store.IsUsernameTaken(ctx, req.Username)
@@ -138,32 +131,9 @@ func (s *Service) Register(ctx context.Context, req *models.RegisterRequest, ip,
 		}
 	}
 
-	var referrer *models.User
-	var invitation *models.Invitation
-	referralMethod := "direct"
-	if req.ReferralCode != "" {
-		referrer, err = s.store.GetUserByReferralCode(ctx, req.ReferralCode)
-		if err != nil {
-			return nil, apperrors.ErrInternalServer
-		}
-		if referrer == nil {
-			invitation, err = s.store.GetInvitationByCode(ctx, req.ReferralCode)
-			if err != nil {
-				return nil, apperrors.ErrInternalServer
-			}
-			if invitation == nil {
-				return nil, ide.ErrInvalidReferralCode
-			}
-			if invitation.Status != "pending" {
-				return nil, ide.ErrReferralAlreadyUsed
-			}
-			if invitation.ExpiresAt.Before(time.Now()) {
-				return nil, ide.ErrInvitationExpired
-			}
-			referralMethod = "invitation"
-		} else {
-			referralMethod = "referral"
-		}
+	referrer, invitation, referralMethod, err := resolveReferralCode(ctx, s.store, req.ReferralCode)
+	if err != nil {
+		return nil, err
 	}
 
 	userID := uuidlib.NewString()
@@ -1247,6 +1217,78 @@ func (s *Service) LogDemoActivityAt(ctx context.Context, userID, action, ip, use
 }
 
 // ─── Internal helpers ─────────────────────────────────
+
+// checkRegistrationAccess enforces registration feature flags.
+// When disabled, returns ErrRegistrationDisabled (HTTP 403 / REGISTRATION_DISABLED).
+func (s *Service) checkRegistrationAccess(referralCode string) error {
+	if s.featureFlags == nil || !s.featureFlags.IsEnabled(featureflags.FlagRegistration) {
+		return ide.ErrRegistrationDisabled
+	}
+	if s.featureFlags.IsEnabled(featureflags.FlagInviteOnly) {
+		return ide.ErrInviteOnly
+	}
+	if s.featureFlags.IsEnabled(featureflags.FlagRequiresReferral) && referralCode == "" {
+		return ide.ErrReferralRequired
+	}
+	return nil
+}
+
+// emailAvailability checks whether an email can be registered.
+type emailAvailability interface {
+	IsEmailTaken(ctx context.Context, email string) (bool, error)
+}
+
+func ensureEmailAvailable(ctx context.Context, st emailAvailability, email string) error {
+	if st == nil {
+		return apperrors.ErrInternalServer
+	}
+	exists, err := st.IsEmailTaken(ctx, email)
+	if err != nil {
+		return apperrors.ErrInternalServer
+	}
+	if exists {
+		return ide.ErrEmailAlreadyExists
+	}
+	return nil
+}
+
+// referralLookup resolves referral / invitation codes.
+type referralLookup interface {
+	GetUserByReferralCode(ctx context.Context, code string) (*models.User, error)
+	GetInvitationByCode(ctx context.Context, code string) (*models.Invitation, error)
+}
+
+// resolveReferralCode validates an optional referral or invitation code.
+// Returns referrer user (if any), invitation (if any), and referral method label.
+func resolveReferralCode(ctx context.Context, st referralLookup, code string) (*models.User, *models.Invitation, string, error) {
+	if code == "" {
+		return nil, nil, "direct", nil
+	}
+	if st == nil {
+		return nil, nil, "", apperrors.ErrInternalServer
+	}
+	referrer, err := st.GetUserByReferralCode(ctx, code)
+	if err != nil {
+		return nil, nil, "", apperrors.ErrInternalServer
+	}
+	if referrer != nil {
+		return referrer, nil, "referral", nil
+	}
+	invitation, err := st.GetInvitationByCode(ctx, code)
+	if err != nil {
+		return nil, nil, "", apperrors.ErrInternalServer
+	}
+	if invitation == nil {
+		return nil, nil, "", ide.ErrInvalidReferralCode
+	}
+	if invitation.Status != "pending" {
+		return nil, nil, "", ide.ErrReferralAlreadyUsed
+	}
+	if invitation.ExpiresAt.Before(time.Now()) {
+		return nil, nil, "", ide.ErrInvitationExpired
+	}
+	return nil, invitation, "invitation", nil
+}
 
 func (s *Service) generateReferralCode(ctx context.Context) string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
