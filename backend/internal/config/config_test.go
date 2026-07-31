@@ -339,3 +339,31 @@ registration:
 		t.Fatal("COINDISTRO_INVITE_ONLY=true should enable invite-only mode")
 	}
 }
+
+func TestLoad_RenderPORTBindsAllInterfaces(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	content := `
+app:
+  environment: development
+server:
+  host: "127.0.0.1"
+  port: 8080
+`
+	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PORT", "10000")
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Server.Port != 10000 {
+		t.Fatalf("port = %d, want 10000", cfg.Server.Port)
+	}
+	if cfg.Server.Host != "0.0.0.0" {
+		t.Fatalf("host = %q, want 0.0.0.0 for Render PORT binding", cfg.Server.Host)
+	}
+}

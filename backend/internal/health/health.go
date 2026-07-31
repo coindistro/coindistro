@@ -51,57 +51,54 @@ type HealthResponse struct {
 	Checks    map[string]string `json:"checks"`
 }
 
-// Health handles the GET /health endpoint.
+// Health handles GET /health for orchestrator liveness (Render, Docker, k8s).
+// It always returns HTTP 200 as soon as the process can serve traffic so platforms
+// do not SIGTERM a successfully started server when a dependency is briefly degraded.
+// Dependency status is reported in the JSON body; use /ready for strict readiness.
 func (h *Checker) Health(c *gin.Context) {
 	checks := make(map[string]string)
 	overallStatus := "healthy"
 
-	// Check database
+	// Keep probes fast so platform health timeouts (often ~5s) are never exceeded.
 	if h.db != nil {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
-		defer cancel()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 500*time.Millisecond)
 		if err := h.db.Ping(ctx); err != nil {
 			checks["database"] = "unhealthy: " + err.Error()
 			overallStatus = "degraded"
-			h.logger.Error("health check: database unhealthy", zap.Error(err))
+			h.logger.Warn("health check: database unhealthy", zap.Error(err))
 		} else {
 			checks["database"] = "healthy"
 			if tableErr := h.verifySchema(ctx); tableErr != nil {
 				checks["schema"] = "unhealthy: " + tableErr.Error()
 				overallStatus = "degraded"
-				h.logger.Error("health check: schema unhealthy", zap.Error(tableErr))
+				h.logger.Warn("health check: schema unhealthy", zap.Error(tableErr))
 			} else {
 				checks["schema"] = "healthy"
 			}
 		}
+		cancel()
 	} else {
 		checks["database"] = "not_configured"
 	}
 
-	// Check Redis
 	if h.redis != nil {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
-		defer cancel()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 500*time.Millisecond)
 		if err := h.redis.Ping(ctx); err != nil {
 			status := h.redis.HealthStatus()
 			checks["redis"] = status
 			overallStatus = "degraded"
-			h.logger.Error("health check: redis unhealthy", zap.String("status", status), zap.Error(err))
+			h.logger.Warn("health check: redis unhealthy", zap.String("status", status), zap.Error(err))
 		} else {
 			checks["redis"] = "healthy"
 		}
+		cancel()
 	} else {
 		checks["redis"] = "not_configured"
 	}
 
 	checks["server"] = "healthy"
 
-	statusCode := http.StatusOK
-	if overallStatus == "degraded" {
-		statusCode = http.StatusServiceUnavailable
-	}
-
-	c.JSON(statusCode, HealthResponse{
+	c.JSON(http.StatusOK, HealthResponse{
 		Status:    overallStatus,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Version:   h.version,
@@ -109,12 +106,11 @@ func (h *Checker) Health(c *gin.Context) {
 	})
 }
 
-// Ready handles the GET /ready endpoint.
+// Ready handles the GET /ready endpoint (strict dependency readiness).
 func (h *Checker) Ready(c *gin.Context) {
 	checks := make(map[string]string)
 	allReady := true
 
-	// Check database
 	if h.db != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()
@@ -131,7 +127,6 @@ func (h *Checker) Ready(c *gin.Context) {
 		checks["database"] = "not_configured"
 	}
 
-	// Check Redis
 	if h.redis != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 		defer cancel()

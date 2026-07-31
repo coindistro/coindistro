@@ -164,13 +164,26 @@ func (c *Cache) Ping(ctx context.Context) error {
 
 // Close closes the Redis connection.
 func (c *Cache) Close() {
-	if c.Client != nil {
-		if err := c.Client.Close(); err != nil {
-			c.logger.Error("failed to close redis connection", zap.Error(err))
-		} else {
-			c.logger.Info("redis connection closed")
-		}
+	if c.Client == nil {
+		return
 	}
+	if err := c.Client.Close(); err != nil {
+		// During graceful shutdown the connection is often already closed by the
+		// platform (Render SIGTERM). go-redis may surface closeNotify timeouts —
+		// treat those as expected, not hard failures.
+		msg := strings.ToLower(err.Error())
+		if errors.Is(err, redis.ErrClosed) ||
+			strings.Contains(msg, "closenotify") ||
+			strings.Contains(msg, "close notify") ||
+			strings.Contains(msg, "connection closed") ||
+			strings.Contains(msg, "redis: client is closed") {
+			c.logger.Warn("redis connection already closed during shutdown", zap.Error(err))
+			return
+		}
+		c.logger.Error("failed to close redis connection", zap.Error(err))
+		return
+	}
+	c.logger.Info("redis connection closed")
 }
 
 // Set stores a value in Redis with an expiration time.

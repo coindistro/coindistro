@@ -340,11 +340,13 @@ func Load(configPath string) (*Config, error) {
 	cfg.Auth.AccessTokenTTL = accessTTL
 	cfg.Auth.RefreshTokenTTL = refreshTTL
 
-	// Support Render's PORT environment variable
+	// Support Render's PORT environment variable and always bind publicly when set.
 	if port := os.Getenv("PORT"); port != "" {
 		var portInt int
 		if _, err := fmt.Sscanf(port, "%d", &portInt); err == nil && portInt > 0 {
 			cfg.Server.Port = portInt
+			// Render (and most PaaS) expect the process to listen on all interfaces.
+			cfg.Server.Host = "0.0.0.0"
 		}
 	}
 

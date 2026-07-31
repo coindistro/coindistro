@@ -180,6 +180,15 @@ type migrationClient interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
+// migrationRenames maps previously deployed filenames to the current unique sequence.
+// Existing production DBs that recorded the old names must not re-run SQL.
+var migrationRenames = map[string]string{
+	"003_genesis_investor_program.sql":     "004_genesis_investor_program.sql",
+	"004_identity_platform_links.sql":      "005_identity_platform_links.sql",
+	"004_investor_earnings_dashboard.sql":  "006_investor_earnings_dashboard.sql",
+	"005_sessions_token_columns.sql":       "007_sessions_token_columns.sql",
+}
+
 func runMigrations(ctx context.Context, db migrationClient, migrationsDir string, logger *zap.Logger) error {
 	if err := ensureSchemaMigrationsTable(ctx, db); err != nil {
 		return err
@@ -191,7 +200,18 @@ func runMigrations(ctx context.Context, db migrationClient, migrationsDir string
 	if len(files) == 0 {
 		return fmt.Errorf("no migration files found in %s", migrationsDir)
 	}
+	if err := validateUniqueMigrationPrefixes(files); err != nil {
+		return err
+	}
 	applied, err := appliedMigrations(ctx, db)
+	if err != nil {
+		return fmt.Errorf("read applied migrations: %w", err)
+	}
+	if err := reconcileRenamedMigrations(ctx, db, applied, logger); err != nil {
+		return err
+	}
+	// Reload after alias inserts so pending detection sees the new names.
+	applied, err = appliedMigrations(ctx, db)
 	if err != nil {
 		return fmt.Errorf("read applied migrations: %w", err)
 	}
@@ -237,6 +257,61 @@ func runMigrations(ctx context.Context, db migrationClient, migrationsDir string
 		logger.Info("migration successful", zap.String("migration", name))
 	}
 	return nil
+}
+
+// reconcileRenamedMigrations records the new filename when an older alias was already applied,
+// preventing partial re-application after renumbering duplicate prefixes.
+func reconcileRenamedMigrations(ctx context.Context, db migrationClient, applied map[string]string, logger *zap.Logger) error {
+	for oldName, newName := range migrationRenames {
+		oldChecksum, hasOld := applied[oldName]
+		_, hasNew := applied[newName]
+		if !hasOld || hasNew {
+			continue
+		}
+		if _, err := db.Exec(ctx,
+			`INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1, $2, NOW()) ON CONFLICT (version) DO NOTHING`,
+			newName,
+			oldChecksum,
+		); err != nil {
+			return fmt.Errorf("record renamed migration %s -> %s: %w", oldName, newName, err)
+		}
+		logger.Info("recorded renamed migration without re-applying",
+			zap.String("from", oldName),
+			zap.String("to", newName),
+		)
+		applied[newName] = oldChecksum
+	}
+	return nil
+}
+
+func validateUniqueMigrationPrefixes(files []string) error {
+	seen := make(map[string]string, len(files))
+	for _, path := range files {
+		name := filepath.Base(path)
+		prefix := migrationPrefix(name)
+		if prefix == "" {
+			return fmt.Errorf("migration %s missing numeric prefix", name)
+		}
+		if existing, ok := seen[prefix]; ok {
+			return fmt.Errorf("duplicate migration prefix %s: %s and %s", prefix, existing, name)
+		}
+		seen[prefix] = name
+	}
+	return nil
+}
+
+func migrationPrefix(filename string) string {
+	base := filepath.Base(filename)
+	parts := strings.SplitN(base, "_", 2)
+	if len(parts) < 2 {
+		return ""
+	}
+	for _, ch := range parts[0] {
+		if ch < '0' || ch > '9' {
+			return ""
+		}
+	}
+	return parts[0]
 }
 
 func findMigrationFiles(migrationsDir string) ([]string, error) {

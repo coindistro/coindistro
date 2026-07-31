@@ -1,4 +1,4 @@
--- 005_sessions_token_columns.sql
+-- 007_sessions_token_columns.sql
 -- Fix: login/register session inserts fail with
 --   "value too long for type character varying(255)"
 -- Root cause: refresh tokens were stored as hex(raw JWT) which exceeds 255 chars.

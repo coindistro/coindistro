@@ -69,6 +69,14 @@ func SetupRouter(
 	// Health checker
 	healthChecker := health.New(db, redis, logger)
 
+	// Root responds immediately for platforms that probe "/" by default.
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": "coindistro-api",
+		})
+	})
+
 	// Health endpoints (no version prefix, used by orchestrators)
 	r.GET("/health", healthChecker.Health)
 	r.GET("/ready", healthChecker.Ready)

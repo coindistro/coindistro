@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -531,13 +532,23 @@ func (s *Server) Start() error {
 	// Channel to listen for errors
 	errChan := make(chan error, 1)
 
-	// Start server in a goroutine
+	// Bind the socket before serving so health probes can succeed as soon as we log "accepting".
+	ln, err := net.Listen("tcp", s.cfg.Server.Address())
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", s.cfg.Server.Address(), err)
+	}
+
+	s.logger.Info("server starting",
+		zap.String("address", s.cfg.Server.Address()),
+		zap.String("environment", s.cfg.App.Environment),
+		zap.String("health_path", "/health"),
+	)
+	s.logger.Info("HTTP server accepting connections",
+		zap.String("address", ln.Addr().String()),
+	)
+
 	go func() {
-		s.logger.Info("server starting",
-			zap.String("address", s.cfg.Server.Address()),
-			zap.String("environment", s.cfg.App.Environment),
-		)
-		if err := s.http.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.http.Serve(ln); err != nil && err != http.ErrServerClosed {
 			errChan <- fmt.Errorf("server error: %w", err)
 		}
 	}()

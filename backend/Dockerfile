@@ -44,8 +44,8 @@ USER appuser
 # Render injects PORT env var; no hardcoded port needed
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:${PORT:-8080}/health || exit 1
 
 ENTRYPOINT ["/app/api"]
 CMD ["--config", "/app/configs/config.yaml"]
