@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void bootstrap();
   }, [clearSession, router]);
 
-  const roles = user?.roles ?? [];
+  const roles = React.useMemo(() => user?.roles ?? [], [user?.roles]);
   const permissions = React.useMemo(() => permissionsForRoles(roles), [roles]);
   // tokenTick forces re-read after login/logout
   const accessToken = tokenTick >= 0 ? getAccessToken() : null;

@@ -27,6 +27,9 @@ import (
 	investhandlers "github.com/coindistro/backend/internal/investments/handlers"
 	investservice "github.com/coindistro/backend/internal/investments/service"
 	investstore "github.com/coindistro/backend/internal/investments/store"
+	earningshandlers "github.com/coindistro/backend/internal/earnings/handlers"
+	earningsservice "github.com/coindistro/backend/internal/earnings/service"
+	earningsstore "github.com/coindistro/backend/internal/earnings/store"
 	"github.com/coindistro/backend/internal/logger"
 	"github.com/coindistro/backend/internal/metrics"
 	"github.com/coindistro/backend/internal/rbac"
@@ -58,6 +61,8 @@ type Server struct {
 	identitySvc        *idservice.Service
 	investmentSvc      *investservice.Service
 	investmentHandlers *investhandlers.Handlers
+	earningsSvc        *earningsservice.Service
+	earningsHandlers   *earningshandlers.Handlers
 	engine             *gin.Engine
 	http               *http.Server
 }
@@ -294,6 +299,8 @@ func New(cfg *config.Config) (*Server, error) {
 	// Initialize Investment Service
 	var investmentSvc *investservice.Service
 	var investmentHandlers *investhandlers.Handlers
+	var earningsSvc *earningsservice.Service
+	var earningsHandlers *earningshandlers.Handlers
 	if db != nil && db.Pool != nil {
 		investmentStore := investstore.New(db.Pool)
 
@@ -343,13 +350,52 @@ func New(cfg *config.Config) (*Server, error) {
 				zap.Duration("interval", time.Minute),
 			)
 		}
+
+		// Initialize Earnings Investor Dashboard service
+		earningsStore := earningsstore.New(db.Pool)
+		earningsCfg := earningsservice.Config{
+			BaseURL:               cfg.App.BaseURL,
+			AppURL:                cfg.App.BaseURL,
+			PaystackSecretKey:     paystackSecretKey,
+			PaystackPublicKey:     paystackPublicKey,
+			FlutterwaveSecretKey:  flutterwaveSecretKey,
+			FlutterwavePublicKey:  flutterwavePublicKey,
+			FlutterwaveSecretHash: flutterwaveSecretHash,
+		}
+		earningsSvc = earningsservice.New(
+			earningsStore,
+			eventBus,
+			jobRegistry,
+			workerPool,
+			nil,
+			log.Logger,
+			earningsCfg,
+		)
+		earningsHandlers = earningshandlers.New(earningsSvc, log.Logger)
+		log.Info("earnings investment service initialized")
+
+		if sched != nil {
+			sched.AddTask(scheduler.Task{
+				ID:       "earnings_daily_rewards",
+				Name:     "Earnings Daily Rewards",
+				Interval: 1 * time.Hour,
+				Handler: func(ctx context.Context) error {
+					return earningsSvc.ProcessDailyRewards(ctx)
+				},
+			})
+			log.Info("Scheduler task registered",
+				zap.String("task_id", "earnings_daily_rewards"),
+				zap.String("name", "Earnings Daily Rewards"),
+				zap.Duration("interval", time.Hour),
+			)
+		}
 	}
 
 	// Create identity handlers
 	identityHandlers := handlers.New(identitySvc, log.Logger)
 
 	// Setup routes
-	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, nil, investmentHandlers, workerPool, sched)
+	engine := routes.SetupRouter(cfg, log.Logger, db, redis, authService, rbacService, ff, promMetrics, identityHandlers, nil, investmentHandlers, earningsHandlers, workerPool, sched)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -379,6 +425,8 @@ func New(cfg *config.Config) (*Server, error) {
 		identitySvc:        identitySvc,
 		investmentSvc:      investmentSvc,
 		investmentHandlers: investmentHandlers,
+		earningsSvc:        earningsSvc,
+		earningsHandlers:   earningsHandlers,
 		engine:             engine,
 		http:               httpServer,
 	}, nil

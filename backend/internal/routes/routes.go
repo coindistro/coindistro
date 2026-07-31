@@ -15,6 +15,7 @@ import (
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
 	earnhandlers "github.com/coindistro/backend/internal/earn/handlers"
+	earningshandlers "github.com/coindistro/backend/internal/earnings/handlers"
 	"github.com/coindistro/backend/internal/featureflags"
 	"github.com/coindistro/backend/internal/health"
 	identityhandlers "github.com/coindistro/backend/internal/identity/handlers"
@@ -40,6 +41,7 @@ func SetupRouter(
 	identityHandlers *identityhandlers.Handlers,
 	earnHandlers *earnhandlers.Handlers,
 	investmentHandlers *handlers.Handlers,
+	earningsHandlers *earningshandlers.Handlers,
 	workerPool *workers.Pool,
 	sched *scheduler.Scheduler,
 ) *gin.Engine {
@@ -129,6 +131,11 @@ func SetupRouter(
 		// Investment module routes (/api/v1/earn/plans, /api/v1/payments/..., /api/v1/wallet, /api/v1/admin/...)
 		if investmentHandlers != nil {
 			handlers.RegisterRoutes(v1, investmentHandlers, middleware.Authentication(authService))
+		}
+
+		// Earnings investor dashboard (/api/v1/investments/..., /api/v1/admin/earnings/...)
+		if earningsHandlers != nil {
+			earningshandlers.RegisterRoutes(v1, earningsHandlers, middleware.Authentication(authService))
 		}
 
 		// Admin routes — super_admin, admin, and moderator

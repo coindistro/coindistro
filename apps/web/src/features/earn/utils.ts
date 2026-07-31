@@ -1,0 +1,55 @@
+export interface InvestmentCalculationInput {
+  amountUsd: number;
+  exchangeRate: number;
+  dailyRewardNgn: number;
+  durationBusinessDays: number;
+  roiPercent: number;
+}
+
+export interface InvestmentCalculation {
+  amountNgn: number;
+  dailyEarningsNgn: number;
+  monthlyEarningsNgn: number;
+  totalEarningsNgn: number;
+  totalPayoutNgn: number;
+  roiPercent: number;
+}
+
+export function calculateInvestment(input: InvestmentCalculationInput): InvestmentCalculation {
+  const amountUsd = Math.max(0, Number(input.amountUsd) || 0);
+  const rate = Math.max(0, Number(input.exchangeRate) || 0);
+  const daily = Math.max(0, Number(input.dailyRewardNgn) || 0);
+  const days = Math.max(0, Math.floor(Number(input.durationBusinessDays) || 0));
+  const roiPercent = Math.max(0, Number(input.roiPercent) || 0);
+  const amountNgn = amountUsd * rate;
+  const totalEarningsNgn = daily * days;
+  return {
+    amountNgn,
+    dailyEarningsNgn: daily,
+    monthlyEarningsNgn: daily * 20,
+    totalEarningsNgn,
+    totalPayoutNgn: amountNgn + totalEarningsNgn,
+    roiPercent,
+  };
+}
+
+export function calculateWithdrawal(amount: number, feePercent: number, penaltyPercent: number, early: boolean) {
+  const requested = Math.max(0, Number(amount) || 0);
+  const fee = requested * Math.max(0, feePercent || 0) / 100;
+  const penalty = early ? requested * Math.max(0, penaltyPercent || 0) / 100 : 0;
+  return { requested, fee, penalty, deductions: fee + penalty, net: Math.max(0, requested - fee - penalty) };
+}
+
+export function formatCurrency(value: number | null | undefined, currency = "₦") {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${currency}${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format(value)}`;
+}
+
+export function getProgressPercentage(daysRemaining: number, totalDays: number) {
+  if (!totalDays) return 0;
+  return Math.min(100, Math.max(0, Math.round(((totalDays - Math.max(0, daysRemaining)) / totalDays) * 100)));
+}
+
+export function buildRewardTimeline(days: number, rewardAmount: number) {
+  return Array.from({ length: Math.max(0, days) }, (_, index) => ({ day: index + 1, amount: rewardAmount }));
+}
