@@ -72,13 +72,32 @@ func New(
 
 // ─── Settings ────────────────────────────────────────────
 
+func defaultInvestmentSettings() *models.InvestmentSettings {
+	return &models.InvestmentSettings{
+		MinimumInvestmentUSD:          30,
+		DailyRewardNGN:                650,
+		MaxBusinessDays:               20,
+		ROIPercent:                    30,
+		ReferralPercent:               10,
+		MinReferralsForPayout:         5,
+		EarlyWithdrawalPenaltyPercent: 15,
+		EarlyWithdrawalFeePercent:     5,
+		WithdrawalProcessingHours:     24,
+		Enabled:                       true,
+	}
+}
+
+func defaultExchangeRate() *models.ExchangeRate {
+	return &models.ExchangeRate{USDTNGN: 1400}
+}
+
 func (s *Service) GetSettings(ctx context.Context) (*models.InvestmentSettings, error) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if settings == nil {
-		return nil, errors.ErrSettingsNotFound
+		return defaultInvestmentSettings(), nil
 	}
 	return settings, nil
 }
@@ -143,7 +162,7 @@ func (s *Service) GetExchangeRate(ctx context.Context) (*models.ExchangeRate, er
 		return nil, err
 	}
 	if rate == nil {
-		return nil, errors.ErrExchangeRateNotFound
+		return defaultExchangeRate(), nil
 	}
 	return rate, nil
 }
@@ -200,6 +219,7 @@ func (s *Service) DeleteFeeTier(ctx context.Context, id string) error {
 // ─── Payment Initialization ──────────────────────────────
 
 func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
+	req.Normalize()
 	settings, rate, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -267,6 +287,7 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 }
 
 func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
+	req.Normalize()
 	settings, rate, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -338,7 +359,7 @@ func (s *Service) validateInvestmentRequest(ctx context.Context, req *models.Ini
 		return nil, nil, err
 	}
 	if settings == nil {
-		return nil, nil, errors.ErrSettingsNotFound
+		settings = defaultInvestmentSettings()
 	}
 	if !settings.Enabled {
 		return nil, nil, errors.ErrSystemDisabled
@@ -355,7 +376,7 @@ func (s *Service) validateInvestmentRequest(ctx context.Context, req *models.Ini
 		return nil, nil, err
 	}
 	if rate == nil {
-		return nil, nil, errors.ErrExchangeRateNotFound
+		rate = defaultExchangeRate()
 	}
 
 	return settings, rate, nil

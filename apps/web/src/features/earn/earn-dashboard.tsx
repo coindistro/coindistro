@@ -398,7 +398,10 @@ export function EarnDashboard() {
         paymentProvider === "paystack"
           ? await investmentApi.initPaystackPayment(investAmount)
           : await investmentApi.initFlutterwavePayment(investAmount);
-      if (!result.authorization_url) {
+      const authorizationUrl =
+        (result as { authorization_url?: string; authorizationUrl?: string }).authorization_url ??
+        (result as { authorization_url?: string; authorizationUrl?: string }).authorizationUrl;
+      if (!authorizationUrl) {
         throw new Error("Payment provider did not return a checkout URL");
       }
       setInvestOpen(false);
@@ -412,7 +415,7 @@ export function EarnDashboard() {
         message: `Your ${paymentProvider === "paystack" ? "Paystack" : "Flutterwave"} checkout is ready. Complete payment to activate your investment.`,
         variant: "success",
       });
-      window.location.assign(result.authorization_url);
+      window.location.assign(authorizationUrl);
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : "Unable to start payment");
     } finally {
