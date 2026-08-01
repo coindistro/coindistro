@@ -775,6 +775,9 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Inve
 // ─── Wallet ───────────────────────────────────────────
 
 func (s *Service) GetWallet(ctx context.Context, userID string) (*models.Wallet, error) {
+	if !s.hasStore() {
+		return &models.Wallet{UserID: userID, AvailableBalance: 0, LockedBalance: 0, TotalBalance: 0}, nil
+	}
 	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -789,6 +792,9 @@ func (s *Service) GetWallet(ctx context.Context, userID string) (*models.Wallet,
 }
 
 func (s *Service) GetWalletTransactions(ctx context.Context, userID string, page, perPage int) ([]*models.WalletTransaction, int, error) {
+	if !s.hasStore() {
+		return []*models.WalletTransaction{}, 0, nil
+	}
 	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
 	if err != nil {
 		return nil, 0, err
@@ -800,6 +806,9 @@ func (s *Service) GetWalletTransactions(ctx context.Context, userID string, page
 
 // ProcessMaturedInvestments checks for matured investments and processes them.
 func (s *Service) ProcessMaturedInvestments(ctx context.Context) error {
+	if !s.hasStore() {
+		return nil
+	}
 	investments, err := s.store.ListMaturedInvestments(ctx, 500)
 	if err != nil {
 		return err
