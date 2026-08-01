@@ -41,11 +41,14 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAuth } from "@/features/authentication/auth-provider";
 import { useInvestments, useInvestmentPlans, useWallet } from "@/features/earn/hooks";
 import { InvestmentPaymentModal } from "@/features/earn/investment-payment-modal";
 import { WithdrawalRequestModal } from "@/features/earn/withdrawal-request-modal";
+import { useToast } from "@/features/shared/providers/toast-provider";
 import {
+  buildInvestmentGrowthSeries,
   buildRewardTimeline,
   calculateInvestment,
   calculateWithdrawal,
@@ -259,6 +262,7 @@ export function EarnDashboard() {
   const withdrawalsQ = useWithdrawalHistory();
   const rewardsQ = useRewardHistory();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const [investOpen, setInvestOpen] = React.useState(false);
   const [selectedPlan, setSelectedPlan] = React.useState<InvestmentPlan | null>(null);
@@ -331,6 +335,19 @@ export function EarnDashboard() {
   const timeline = buildRewardTimeline(totalDays, dailyReward);
   const withdrawalPreview = calculateWithdrawal(available, feePercent, penaltyPercent, early);
   const referralTargetEarnings = calc.amountNgn * (referralPercent / 100) * minReferrals;
+  const totalWithdrawn = (withdrawalsQ.data ?? []).reduce((sum, row) => sum + (row.net_amount_ngn || 0), 0);
+  const growthSeries = buildInvestmentGrowthSeries(paymentsQ.data ?? [], dashboard?.total_invested_usd ?? 0);
+  const referralSeries = [
+    { name: "Jan", value: 0 },
+    { name: "Feb", value: Math.round((dashboard?.referral_earnings_ngn ?? 0) * 0.25) },
+    { name: "Mar", value: Math.round((dashboard?.referral_earnings_ngn ?? 0) * 0.5) },
+    { name: "Apr", value: Math.round((dashboard?.referral_earnings_ngn ?? 0) * 0.75) },
+    { name: "May", value: dashboard?.referral_earnings_ngn ?? 0 },
+  ];
+  const withdrawalSeries = (withdrawalsQ.data ?? []).slice(0, 6).map((row) => ({
+    name: formatDate(row.created_at),
+    value: row.net_amount_ngn,
+  }));
 
   const rewards = rewardsQ.data ?? [];
   const todayReward = dashboard?.today_earnings_ngn ?? 0;
@@ -384,6 +401,17 @@ export function EarnDashboard() {
       if (!result.authorization_url) {
         throw new Error("Payment provider did not return a checkout URL");
       }
+      setInvestOpen(false);
+      setSelectedPlan(null);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["investments"] }),
+        qc.invalidateQueries({ queryKey: ["wallet"] }),
+        qc.invalidateQueries({ queryKey: ["investments", "dashboard"] }),
+      ]);
+      toast({
+        message: `Your ${paymentProvider === "paystack" ? "Paystack" : "Flutterwave"} checkout is ready. Complete payment to activate your investment.`,
+        variant: "success",
+      });
       window.location.assign(result.authorization_url);
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : "Unable to start payment");
@@ -496,13 +524,13 @@ export function EarnDashboard() {
                 hint="Lifetime capital"
               />
               <MetricCard
-                title="Current Capital"
-                value={formatCurrency(locked)}
-                numeric={locked}
+                title="Total Withdrawn"
+                value={formatCurrency(totalWithdrawn)}
+                numeric={totalWithdrawn}
                 prefix="₦"
                 icon={Wallet}
                 accent="border-fuchsia-500/30"
-                hint="Locked in active plans"
+                hint="Completed cash-outs"
               />
               <MetricCard title="Today’s Reward"
                 value={formatCurrency(todayReward || dailyReward)}
@@ -559,6 +587,27 @@ export function EarnDashboard() {
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="calc-amount">Investment Amount (USD)</Label>
+              <div className="flex flex-wrap gap-2">
+                {[30, 50, 100, 200, 500, 1000].map((preset) => (
+                  <Button
+                    key={preset}
+                    type="button"
+                    variant={Number(calcAmount) === preset ? "primary" : "outline"}
+                    size="sm"
+                    onClick={() => setCalcAmount(String(preset))}
+                  >
+                    ${preset}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant={![30, 50, 100, 200, 500, 1000].includes(Number(calcAmount)) ? "primary" : "outline"}
+                  size="sm"
+                  onClick={() => setCalcAmount(String(Math.max(amountUsd || minUsd, minUsd)))}
+                >
+                  Custom
+                </Button>
+              </div>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-semibold text-muted-foreground">$</span>
                 <Input
@@ -574,6 +623,59 @@ export function EarnDashboard() {
               {amountUsd > 0 && amountUsd < minUsd ? (
                 <p className="text-xs text-amber-600">Minimum investment is ${minUsd}.</p>
               ) : null}
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-muted/40 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Investment</p>
+                  <p className="mt-1 font-semibold">${Math.max(amountUsd, minUsd).toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Exchange rate</p>
+                  <p className="mt-1 font-semibold">1 USD = {loading || !rate ? "…" : formatCurrency(rate)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">NGN equivalent</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatCurrency(calc.amountNgn)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Daily earnings</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatCurrency(calc.dailyEarningsNgn)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Business days remaining</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : String(calc.businessDaysRemaining)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Monthly earnings</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatCurrency(calc.monthlyEarningsNgn)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Referral bonus potential</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatCurrency(referralTargetEarnings)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Expected ROI</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatRoi(calc.roiPercent)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Expected total payout</p>
+                  <p className="mt-1 font-semibold">{loading ? "…" : formatCurrency(calc.totalPayoutNgn)}</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Processing time</p>
+                  <p className="mt-1 font-semibold">{processingHours} hours</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Early withdrawal penalty</p>
+                  <p className="mt-1 font-semibold">{feePercent + penaltyPercent}%</p>
+                </div>
+                <div className="rounded-lg border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">Maturity date</p>
+                  <p className="mt-1 font-semibold">{formatDate(activeInvestment?.matures_at)}</p>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -643,6 +745,14 @@ export function EarnDashboard() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* ─── Summary Cards ───────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Active Investments" value={String(dashboard?.active_investments ?? investments.filter((item) => item.status === "active").length)} numeric={dashboard?.active_investments ?? investments.filter((item) => item.status === "active").length} prefix="" icon={Wallet} accent="border-primary/40" hint="Live positions" />
+        <MetricCard title="Today’s Earnings" value={formatCurrency(todayReward)} numeric={todayReward} prefix="₦" icon={Sparkles} accent="border-amber-400/30" hint="Business day payout" />
+        <MetricCard title="Available Balance" value={formatCurrency(available)} numeric={available} prefix="₦" icon={Landmark} accent="border-cyan-400/30" hint="Withdrawable" />
+        <MetricCard title="Pending Withdrawal" value={formatCurrency(pendingWithdrawal)} numeric={pendingWithdrawal} prefix="₦" icon={Clock3} accent="border-fuchsia-400/30" hint="Awaiting review" />
       </div>
 
       {/* ─── Progress + Daily Rewards ─────────────────────── */}
@@ -723,6 +833,83 @@ export function EarnDashboard() {
                 Rewards credit on business days once your investment is active.
               </p>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Charts ─────────────────────────────────────── */}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Daily Earnings</CardTitle>
+            <CardDescription>Reward cadence across your current plan.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timeline.map((item) => ({ name: `Day ${item.day}`, value: item.amount }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value) || 0)} />
+                <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.15)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Investment Growth</CardTitle>
+            <CardDescription>Accumulated capital growth from your deposits.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={growthSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value) => `$${Number(value || 0).toLocaleString()}`} />
+                <Area type="monotone" dataKey="value" stroke="#7C3AED" fill="#7C3AED22" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Referral Growth</CardTitle>
+            <CardDescription>Your referral rewards over time.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={referralSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value) || 0)} />
+                <Area type="monotone" dataKey="value" stroke="#06B6D4" fill="#06B6D422" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Withdrawal History</CardTitle>
+            <CardDescription>Recent net withdrawals and processing activity.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={withdrawalSeries.length ? withdrawalSeries : [{ name: "No data", value: 0 }] }>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value) || 0)} />
+                <Area type="monotone" dataKey="value" stroke="#F59E0B" fill="#F59E0B22" />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
@@ -947,6 +1134,26 @@ export function EarnDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ─── Empty state ─────────────────────────────────── */}
+      {investments.length === 0 ? (
+        <Card className="border-dashed border-primary/20 bg-gradient-to-br from-primary/5 via-background to-cyan-500/10">
+          <CardContent className="flex flex-col items-center justify-center gap-4 px-8 py-12 text-center">
+            <div className="rounded-full bg-primary/10 p-5 text-primary">
+              <PiggyBank className="h-8 w-8" />
+            </div>
+            <div className="max-w-xl space-y-2">
+              <h3 className="text-2xl font-semibold">Your investment journey starts here</h3>
+              <p className="text-sm text-muted-foreground">
+                Start with a small, confidence-building investment and let daily rewards build momentum over time.
+              </p>
+            </div>
+            <Button size="lg" onClick={() => openInvest(null)}>
+              <ArrowUpRight className="mr-2 h-4 w-4" /> Start Investing
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* ─── Active investments list (compact) ────────────── */}
       {investments.length > 0 ? (

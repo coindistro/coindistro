@@ -81,6 +81,40 @@ export function buildRewardTimeline(days: number, rewardAmount: number) {
   return Array.from({ length: Math.max(0, days) }, (_, index) => ({ day: index + 1, amount: rewardAmount }));
 }
 
+export function buildInvestmentGrowthSeries(
+  payments: Array<{ amount_usd?: number; created_at?: string | null }>,
+  currentValueUsd: number,
+) {
+  const points = payments
+    .filter((payment) => Number(payment.amount_usd) > 0)
+    .slice(0, 5)
+    .map((payment) => ({
+      name: payment.created_at
+        ? new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(new Date(payment.created_at))
+        : "Deposit",
+      value: Number(payment.amount_usd) || 0,
+    }));
+
+  if (!points.length) {
+    return [{ name: "Start", value: 0 }, { name: "Now", value: Math.max(0, currentValueUsd) }];
+  }
+
+  const cumulative = points.reduce<Array<{ name: string; value: number }>>((acc, point) => {
+    const prev = acc[acc.length - 1]?.value ?? 0;
+    acc.push({ name: point.name, value: prev + point.value });
+    return acc;
+  }, []);
+
+  const targetValue = Math.max(0, currentValueUsd);
+  if (points.length > 0) {
+    cumulative.push({ name: "Now", value: targetValue });
+  } else if (cumulative[cumulative.length - 1]?.value !== targetValue) {
+    cumulative[cumulative.length - 1].value = targetValue;
+  }
+
+  return cumulative;
+}
+
 export function greetingForHour(hour = new Date().getHours()) {
   if (hour < 12) return "Good Morning";
   if (hour < 17) return "Good Afternoon";

@@ -127,7 +127,7 @@ export function WithdrawalRequestModal({
               onChange={(event) => setConfirmed(event.target.checked)}
               disabled={isSubmitting}
             />
-            <span>I confirm this withdrawal request and understand fees may apply.</span>
+            <span>I understand withdrawals take up to 24 hours and confirm this request.</span>
           </label>
         </div>
 

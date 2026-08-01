@@ -496,6 +496,8 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 		// Payment initiation
 		authed.POST("/payments/paystack/init", h.InitPaystackPayment)
 		authed.POST("/payments/flutterwave/init", h.InitFlutterwavePayment)
+		authed.POST("/payments/paystack/initiate", h.InitPaystackPayment)
+		authed.POST("/payments/flutterwave/initiate", h.InitFlutterwavePayment)
 
 		// Investment dashboard
 		authed.GET("/earn/investments", h.GetDashboard)

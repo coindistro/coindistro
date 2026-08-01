@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildInvestmentGrowthSeries,
   buildRewardTimeline,
   calculateInvestment,
   calculateWithdrawal,
@@ -70,6 +71,22 @@ describe("earn helpers", () => {
       { day: 1, amount: 650 },
       { day: 2, amount: 650 },
       { day: 3, amount: 650 },
+    ]);
+  });
+
+  it("builds a cumulative investment growth series from payments", () => {
+    expect(
+      buildInvestmentGrowthSeries(
+        [
+          { amount_usd: 30, created_at: "2024-01-01T00:00:00Z" },
+          { amount_usd: 20, created_at: "2024-01-15T00:00:00Z" },
+        ] satisfies Array<{ amount_usd?: number; created_at?: string | null }>,
+        50,
+      ),
+    ).toEqual([
+      { name: "Jan 01", value: 30 },
+      { name: "Jan 15", value: 50 },
+      { name: "Now", value: 50 },
     ]);
   });
 });

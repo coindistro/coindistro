@@ -25,14 +25,14 @@ export async function getDashboard(): Promise<EarningsDashboard> {
 }
 
 export async function initPaystackPayment(amountUsd: number): Promise<InitPaymentResponse> {
-  return api.post<InitPaymentResponse>("/api/v1/investments/paystack/init", {
+  return api.post<InitPaymentResponse>("/api/v1/investments/payments/paystack/initiate", {
     amount_usd: amountUsd,
     currency: "NGN",
   });
 }
 
 export async function initFlutterwavePayment(amountUsd: number): Promise<InitPaymentResponse> {
-  return api.post<InitPaymentResponse>("/api/v1/investments/flutterwave/init", {
+  return api.post<InitPaymentResponse>("/api/v1/investments/payments/flutterwave/initiate", {
     amount_usd: amountUsd,
     currency: "NGN",
   });
