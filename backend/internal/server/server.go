@@ -302,25 +302,35 @@ func New(cfg *config.Config) (*Server, error) {
 	var investmentHandlers *investhandlers.Handlers
 	var earningsSvc *earningsservice.Service
 	var earningsHandlers *earningshandlers.Handlers
+
+	// Read API keys from config
+	paystackSecretKey := os.Getenv("COINDISTRO_PAYSTACK_SECRET_KEY")
+	paystackPublicKey := os.Getenv("COINDISTRO_PAYSTACK_PUBLIC_KEY")
+	flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
+	flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
+	flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
+
+	investmentCfg := investservice.Config{
+		BaseURL:               cfg.App.BaseURL,
+		PaystackSecretKey:     paystackSecretKey,
+		PaystackPublicKey:     paystackPublicKey,
+		FlutterwaveSecretKey:  flutterwaveSecretKey,
+		FlutterwavePublicKey:  flutterwavePublicKey,
+		FlutterwaveSecretHash: flutterwaveSecretHash,
+	}
+
+	earningsCfg := earningsservice.Config{
+		BaseURL:               cfg.App.BaseURL,
+		AppURL:                cfg.App.BaseURL,
+		PaystackSecretKey:     paystackSecretKey,
+		PaystackPublicKey:     paystackPublicKey,
+		FlutterwaveSecretKey:  flutterwaveSecretKey,
+		FlutterwavePublicKey:  flutterwavePublicKey,
+		FlutterwaveSecretHash: flutterwaveSecretHash,
+	}
+
 	if db != nil && db.Pool != nil {
 		investmentStore := investstore.New(db.Pool)
-
-		// Read API keys from config
-		paystackSecretKey := os.Getenv("COINDISTRO_PAYSTACK_SECRET_KEY")
-		paystackPublicKey := os.Getenv("COINDISTRO_PAYSTACK_PUBLIC_KEY")
-		flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
-		flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
-		flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
-
-		investmentCfg := investservice.Config{
-			BaseURL:               cfg.App.BaseURL,
-			PaystackSecretKey:     paystackSecretKey,
-			PaystackPublicKey:     paystackPublicKey,
-			FlutterwaveSecretKey:  flutterwaveSecretKey,
-			FlutterwavePublicKey:  flutterwavePublicKey,
-			FlutterwaveSecretHash: flutterwaveSecretHash,
-		}
-
 		investmentSvc = investservice.New(
 			investmentStore,
 			eventBus,
@@ -354,15 +364,6 @@ func New(cfg *config.Config) (*Server, error) {
 
 		// Initialize Earnings Investor Dashboard service
 		earningsStore := earningsstore.New(db.Pool)
-		earningsCfg := earningsservice.Config{
-			BaseURL:               cfg.App.BaseURL,
-			AppURL:                cfg.App.BaseURL,
-			PaystackSecretKey:     paystackSecretKey,
-			PaystackPublicKey:     paystackPublicKey,
-			FlutterwaveSecretKey:  flutterwaveSecretKey,
-			FlutterwavePublicKey:  flutterwavePublicKey,
-			FlutterwaveSecretHash: flutterwaveSecretHash,
-		}
 		earningsSvc = earningsservice.New(
 			earningsStore,
 			eventBus,
@@ -390,6 +391,12 @@ func New(cfg *config.Config) (*Server, error) {
 				zap.Duration("interval", time.Hour),
 			)
 		}
+	} else {
+		log.Warn("database not configured; starting investment API in fallback mode")
+		investmentSvc = investservice.New(nil, eventBus, jobRegistry, workerPool, nil, promMetrics, log.Logger, investmentCfg)
+		investmentHandlers = investhandlers.New(investmentSvc, log.Logger)
+		earningsSvc = earningsservice.New(nil, eventBus, jobRegistry, workerPool, nil, log.Logger, earningsCfg)
+		earningsHandlers = earningshandlers.New(earningsSvc, log.Logger)
 	}
 
 	// Create identity handlers

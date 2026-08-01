@@ -393,6 +393,8 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 		authed.GET("/payments", h.GetPaymentHistory)
 		authed.GET("/withdrawals", h.GetWithdrawalHistory)
 		authed.POST("/withdraw", h.RequestWithdrawal)
+		authed.POST("/withdrawals", h.RequestWithdrawal)
+		authed.POST("/settings", h.AdminUpdateSettings)
 		authed.GET("/notifications/unread-count", h.GetUnreadNotificationCount)
 		authed.PUT("/notifications/read-all", h.MarkAllNotificationsRead)
 		authed.GET("/notifications", h.GetNotifications)

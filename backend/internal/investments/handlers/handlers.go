@@ -484,6 +484,8 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 	// Public routes
 	rg.GET("/earn/plans", h.ListPlans)
 	rg.GET("/earn/plans/:id", h.GetPlan)
+	rg.GET("/investments/plans", h.ListPlans)
+	rg.GET("/investments/plans/:id", h.GetPlan)
 
 	// Webhooks (no auth - signature verified in handler)
 	rg.POST("/payments/paystack/webhook", h.PaystackWebhook)

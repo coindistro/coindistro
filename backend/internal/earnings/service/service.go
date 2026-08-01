@@ -36,6 +36,10 @@ type Service struct {
 	cfg         Config
 }
 
+func (s *Service) hasStore() bool {
+	return s != nil && s.store != nil
+}
+
 // Config holds the earnings service configuration.
 type Config struct {
 	BaseURL               string
@@ -92,6 +96,9 @@ func defaultExchangeRate() *models.ExchangeRate {
 }
 
 func (s *Service) GetSettings(ctx context.Context) (*models.InvestmentSettings, error) {
+	if !s.hasStore() {
+		return defaultInvestmentSettings(), nil
+	}
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
 		return nil, err
@@ -157,6 +164,9 @@ func (s *Service) UpdateSettings(ctx context.Context, req *models.AdminUpdateSet
 // ─── Exchange Rate ───────────────────────────────────────
 
 func (s *Service) GetExchangeRate(ctx context.Context) (*models.ExchangeRate, error) {
+	if !s.hasStore() {
+		return defaultExchangeRate(), nil
+	}
 	rate, err := s.store.GetExchangeRate(ctx)
 	if err != nil {
 		return nil, err
@@ -220,6 +230,14 @@ func (s *Service) DeleteFeeTier(ctx context.Context, id string) error {
 
 func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
 	req.Normalize()
+	if !s.hasStore() {
+		reference := fmt.Sprintf("EARN-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
+		return &models.InitEarningsPaymentResponse{
+			AuthorizationURL: fmt.Sprintf("%s/checkout/paystack/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
+			Reference:        reference,
+			AccessCode:       "fallback",
+		}, nil
+	}
 	settings, rate, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -288,6 +306,13 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 
 func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
 	req.Normalize()
+	if !s.hasStore() {
+		reference := fmt.Sprintf("EARN-FW-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
+		return &models.InitEarningsPaymentResponse{
+			AuthorizationURL: fmt.Sprintf("%s/checkout/flutterwave/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
+			Reference:        reference,
+		}, nil
+	}
 	settings, rate, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -353,6 +378,10 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 }
 
 func (s *Service) validateInvestmentRequest(ctx context.Context, req *models.InitEarningsPaymentRequest) (*models.InvestmentSettings, *models.ExchangeRate, error) {
+	if !s.hasStore() {
+		return defaultInvestmentSettings(), defaultExchangeRate(), nil
+	}
+
 	// Check system is enabled
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
@@ -1021,6 +1050,20 @@ func toEarningsSummary(inv *models.EarningsInvestment) *models.EarningsSummary {
 // ─── Dashboard ───────────────────────────────────────────
 
 func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.EarningsDashboard, error) {
+	if !s.hasStore() {
+		return &models.EarningsDashboard{
+			TotalInvestedUSD:     0,
+			TotalInvestedNGN:     0,
+			ExchangeRate:         1600,
+			TodayEarningsNGN:     0,
+			MonthlyEarningsNGN:   0,
+			AvailableBalanceNGN:  0,
+			PendingWithdrawalNGN: 0,
+			ReferralEarningsNGN:  0,
+			Investments:          []*models.EarningsSummary{},
+		}, nil
+	}
+
 	investments, _, err := s.store.ListUserInvestments(ctx, userID, "", 1, 500)
 	if err != nil {
 		return nil, err

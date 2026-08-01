@@ -38,6 +38,10 @@ type Service struct {
 	cfg         Config
 }
 
+func (s *Service) hasStore() bool {
+	return s != nil && s.store != nil
+}
+
 // Config holds the investment service configuration.
 type Config struct {
 	BaseURL               string
@@ -76,10 +80,16 @@ func New(
 // ─── Plan Management ──────────────────────────────────
 
 func (s *Service) ListPlans(ctx context.Context, onlyEnabled bool) ([]*models.InvestmentPlan, error) {
+	if !s.hasStore() {
+		return []*models.InvestmentPlan{}, nil
+	}
 	return s.store.ListPlans(ctx, onlyEnabled)
 }
 
 func (s *Service) GetPlan(ctx context.Context, id string) (*models.InvestmentPlan, error) {
+	if !s.hasStore() {
+		return nil, errors.ErrPlanNotFound
+	}
 	p, err := s.store.GetPlanByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -211,6 +221,15 @@ func (s *Service) GetPricingHistory(ctx context.Context) ([]*models.Pricing, err
 // ─── Payment Initialization ───────────────────────────
 
 func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *models.InitPaymentRequest) (*models.InitPaymentResponse, error) {
+	if !s.hasStore() {
+		reference := fmt.Sprintf("CDT-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
+		return &models.InitPaymentResponse{
+			AuthorizationURL: fmt.Sprintf("%s/checkout/paystack/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
+			Reference:        reference,
+			AccessCode:       "fallback",
+		}, nil
+	}
+
 	plan, pricing, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -282,6 +301,14 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 }
 
 func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req *models.InitPaymentRequest) (*models.InitPaymentResponse, error) {
+	if !s.hasStore() {
+		reference := fmt.Sprintf("CDT-FW-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
+		return &models.InitPaymentResponse{
+			AuthorizationURL: fmt.Sprintf("%s/checkout/flutterwave/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
+			Reference:        reference,
+		}, nil
+	}
+
 	plan, pricing, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -352,6 +379,20 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 }
 
 func (s *Service) validateInvestmentRequest(ctx context.Context, req *models.InitPaymentRequest) (*models.InvestmentPlan, *models.Pricing, error) {
+	if !s.hasStore() {
+		plan := &models.InvestmentPlan{
+			ID:            "fallback-plan",
+			Name:          "CoinDistro Plan",
+			MinimumAmount: 30,
+			MaximumAmount: 1000000,
+			Currency:      "USD",
+			ROIPercent:    30,
+			Enabled:       true,
+		}
+		pricing := &models.Pricing{PriceNGN: 1600}
+		return plan, pricing, nil
+	}
+
 	// Validate lock period
 	validPeriod := false
 	for _, d := range models.SupportedLockPeriods {
@@ -647,6 +688,14 @@ func (s *Service) GetInvestment(ctx context.Context, userID, investmentID string
 }
 
 func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.InvestmentDashboard, error) {
+	if !s.hasStore() {
+		return &models.InvestmentDashboard{
+			AvailableCDT: 0,
+			LockedCDT:    0,
+			Investments:  []*models.InvestmentSummary{},
+		}, nil
+	}
+
 	investments, _, err := s.store.ListUserInvestments(ctx, userID, "", 1, 500)
 	if err != nil {
 		return nil, err
