@@ -113,9 +113,9 @@ CREATE TABLE IF NOT EXISTS cdt_pricing (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Re-run safe: use a deterministic identifier so the default price row can be inserted once.
+-- Re-run safe: use a generated identifier so the default price row can be inserted once.
 INSERT INTO cdt_pricing (id, price_ngn)
-VALUES ('11111111-1111-1111-1111-111111111111'::uuid, 10.00)
+VALUES (gen_random_uuid(), 10.00)
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── Webhook Processing Log ───────────────────────────
@@ -140,10 +140,10 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_reference ON webhook_events(refere
 CREATE UNIQUE INDEX IF NOT EXISTS idx_investment_plans_name ON investment_plans(name);
 
 INSERT INTO investment_plans (id, name, description, minimum_amount, maximum_amount, currency, roi_percent, enabled) VALUES
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'Starter', 'Perfect for beginners. Start your CDT investment journey with a small amount.', 1000, 50000, 'NGN', 5.0000, true),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid, 'Builder', 'Build your CDT portfolio with medium-term investment.', 50000, 500000, 'NGN', 10.0000, true),
-    ('cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid, 'Pro', 'Professional grade investment for serious investors.', 500000, 5000000, 'NGN', 15.0000, true),
-    ('dddddddd-dddd-dddd-dddd-dddddddddddddd'::uuid, 'Whale', 'Maximum returns for maximum investment. Exclusive high-tier plan.', 5000000, 50000000, 'NGN', 25.0000, true)
+    (gen_random_uuid(), 'Starter', 'Perfect for beginners. Start your CDT investment journey with a small amount.', 1000, 50000, 'NGN', 5.0000, true),
+    (gen_random_uuid(), 'Builder', 'Build your CDT portfolio with medium-term investment.', 50000, 500000, 'NGN', 10.0000, true),
+    (gen_random_uuid(), 'Pro', 'Professional grade investment for serious investors.', 500000, 5000000, 'NGN', 15.0000, true),
+    (gen_random_uuid(), 'Whale', 'Maximum returns for maximum investment. Exclusive high-tier plan.', 5000000, 50000000, 'NGN', 25.0000, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ─── Triggers ─────────────────────────────────────────
