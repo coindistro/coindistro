@@ -13,34 +13,48 @@ import {
   CardTitle,
   Input,
   Label,
-  PageHeader,
   Progress,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  StatCard,
+  Skeleton,
   Switch,
 } from "@coindistro/cds";
 import {
   ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   Copy,
+  CreditCard,
   Gift,
+  Landmark,
+  Lock,
   PiggyBank,
+  ShieldCheck,
   Settings2,
   Sparkles,
+  TrendingUp,
   Wallet,
+  Zap,
 } from "lucide-react";
+import { useAuth } from "@/features/authentication/auth-provider";
 import { useInvestments, useInvestmentPlans, useWallet } from "@/features/earn/hooks";
 import { InvestmentPaymentModal } from "@/features/earn/investment-payment-modal";
 import { WithdrawalRequestModal } from "@/features/earn/withdrawal-request-modal";
 import {
+  buildRewardTimeline,
   calculateInvestment,
+  calculateWithdrawal,
+  deriveRoiPercent,
   formatCurrency,
+  formatRoi,
+  getCompletedBusinessDays,
   getProgressPercentage,
+  greetingForHour,
 } from "@/features/earn/utils";
 import {
   useDashboard,
@@ -53,6 +67,7 @@ import {
 import * as investmentApi from "@/features/investments/api";
 import type { InvestmentPlan, InvestmentSummary } from "@/lib/api/types";
 import type { EarningsSummary } from "@/features/investments/types";
+import { displayName } from "@/lib/utils/format";
 
 const PREFS_KEY = "coindistro.earn.preferences";
 
@@ -87,7 +102,12 @@ function statusVariant(
   if (status === "active" || status === "completed" || status === "paid") {
     return status === "active" || status === "paid" ? "success" : "secondary";
   }
-  if (status === "pending" || status === "pending_payment" || status === "pending_review" || status === "processing") {
+  if (
+    status === "pending" ||
+    status === "pending_payment" ||
+    status === "pending_review" ||
+    status === "processing"
+  ) {
     return "warning";
   }
   if (status === "failed" || status === "cancelled" || status === "rejected") {
@@ -98,13 +118,16 @@ function statusVariant(
 
 function normalizeInvestment(item: InvestmentSummary | EarningsSummary): InvestmentSummary {
   if ("plan_name" in item) return item;
+  const amountNgn = item.amount_ngn;
+  const earnedNgn = item.total_earned_ngn;
   return {
     id: item.id,
-    plan_name: "Investment plan",
-    amount_paid: item.amount_ngn,
-    allocated_cdt: item.amount_ngn,
-    roi_cdt: item.total_earned_ngn,
-    roi_percent: 0,
+    plan_name: "CoinDistro Plan",
+    amount_paid: amountNgn,
+    allocated_cdt: amountNgn,
+    roi_cdt: earnedNgn,
+    roi_percent: deriveRoiPercent(earnedNgn, amountNgn),
+    daily_reward_ngn: item.daily_reward_ngn,
     status: item.status,
     lock_period_days: item.max_business_days,
     days_remaining: item.remaining_days,
@@ -113,126 +136,6 @@ function normalizeInvestment(item: InvestmentSummary | EarningsSummary): Investm
     matures_at: item.maturity_date,
     created_at: item.created_at,
   };
-}
-
-function InvestmentCard({
-  investment,
-  dailyRewardNgn,
-}: {
-  investment: InvestmentSummary;
-  dailyRewardNgn: number;
-}) {
-  const progress =
-    investment.progress_pct ??
-    getProgressPercentage(
-      investment.days_remaining ?? investment.lock_period_days,
-      investment.lock_period_days,
-    );
-  const nextPayout = investment.status === "active" ? dailyRewardNgn : 0;
-
-  return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold">{investment.plan_name || "Investment plan"}</p>
-          <p className="text-xs text-muted-foreground">
-            {investment.lock_period_days} business days
-          </p>
-        </div>
-        <Badge variant={statusVariant(String(investment.status))} className="capitalize">
-          {String(investment.status).replaceAll("_", " ")}
-        </Badge>
-      </div>
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-xs text-muted-foreground">Invested</p>
-          <p className="font-medium">{formatCurrency(investment.amount_paid)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Total earnings</p>
-          <p className="font-medium">{formatCurrency(investment.roi_cdt)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Next payout</p>
-          <p className="font-medium">{formatCurrency(nextPayout)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Maturity date</p>
-          <p className="font-medium">{formatDate(investment.matures_at)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Days remaining</p>
-          <p className="font-medium">{investment.days_remaining ?? "—"}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Investment status</p>
-          <p className="font-medium capitalize">{String(investment.status).replaceAll("_", " ")}</p>
-        </div>
-      </div>
-      {investment.status === "active" && (
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-            <span>Investment progress</span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HistoryCard({
-  title,
-  rows,
-  amount,
-}: {
-  title: string;
-  rows: Array<{
-    id: string;
-    status: string;
-    created_at: string;
-    amount_ngn?: number;
-    amount_usd?: number;
-    fee_ngn?: number;
-    net_amount_ngn?: number;
-  }>;
-  amount: (row: {
-    amount_ngn?: number;
-    amount_usd?: number;
-    fee_ngn?: number;
-    net_amount_ngn?: number;
-  }) => string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {rows.length ? (
-          <div className="space-y-3">
-            {rows.slice(0, 8).map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 border-b pb-3 text-sm last:border-0 last:pb-0"
-              >
-                <div>
-                  <p className="font-medium">{amount(row)}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(row.created_at)}</p>
-                </div>
-                <Badge variant={statusVariant(row.status)} className="capitalize">
-                  {row.status.replaceAll("_", " ")}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No records yet.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 function loadPreferences(): EarnPreferences {
@@ -246,7 +149,106 @@ function loadPreferences(): EarnPreferences {
   }
 }
 
+function useAnimatedNumber(value: number, enabled = true) {
+  const [display, setDisplay] = React.useState(value || 0);
+  const displayRef = React.useRef(display);
+  displayRef.current = display;
+
+  React.useEffect(() => {
+    if (!enabled || !Number.isFinite(value)) {
+      setDisplay(value || 0);
+      return;
+    }
+    let frame = 0;
+    const start = displayRef.current;
+    const delta = value - start;
+    const duration = 700;
+    const started = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(start + delta * eased);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value, enabled]);
+
+  return display;
+}
+
+function MetricCard({
+  title,
+  value,
+  hint,
+  icon: Icon,
+  accent,
+  loading,
+  numeric,
+  prefix = "",
+  suffix = "",
+}: {
+  title: string;
+  value: string;
+  hint?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  loading?: boolean;
+  numeric?: number;
+  prefix?: string;
+  suffix?: string;
+}) {
+  const animated = useAnimatedNumber(numeric ?? 0, numeric != null && !loading);
+  const shown =
+    loading
+      ? "…"
+      : numeric != null
+        ? `${prefix}${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format(animated)}${suffix}`
+        : value;
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-primary/20 ${accent}`}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-cyan-400/5 opacity-80" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight">{shown}</p>
+          {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+        </div>
+        <div className="rounded-xl bg-primary/15 p-2 text-primary transition group-hover:scale-110">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  icon: Icon,
+  accent = "text-primary",
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 transition hover:border-primary/30">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon className={`h-3.5 w-3.5 ${accent}`} />
+        <span>{label}</span>
+      </div>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 export function EarnDashboard() {
+  const { user } = useAuth();
   const walletQ = useWallet();
   const legacyInvestmentsQ = useInvestments();
   const plansQ = useInvestmentPlans();
@@ -258,22 +260,27 @@ export function EarnDashboard() {
   const rewardsQ = useRewardHistory();
   const qc = useQueryClient();
 
+  const [investOpen, setInvestOpen] = React.useState(false);
   const [selectedPlan, setSelectedPlan] = React.useState<InvestmentPlan | null>(null);
+  const [calcAmount, setCalcAmount] = React.useState("");
   const [paying, setPaying] = React.useState(false);
   const [withdrawOpen, setWithdrawOpen] = React.useState(false);
   const [withdrawing, setWithdrawing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [prefs, setPrefs] = React.useState<EarnPreferences>(defaultPrefs);
   const [paymentError, setPaymentError] = React.useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [provider, setProvider] = React.useState<"paystack" | "flutterwave">("paystack");
 
   React.useEffect(() => {
-    setPrefs(loadPreferences());
+    const loaded = loadPreferences();
+    setPrefs(loaded);
+    setProvider(loaded.preferredPaymentMethod);
   }, []);
 
   const dashboard = dashboardQ.data;
   const settings = settingsQ.data;
-  const rate =
-    rateQ.data?.usd_to_ngn ?? dashboard?.exchange_rate ?? 1600;
+  const rate = rateQ.data?.usd_to_ngn ?? dashboard?.exchange_rate ?? 0;
   const plans = Array.isArray(plansQ.data) ? plansQ.data : [];
   const investments: InvestmentSummary[] =
     dashboard?.investments?.map(normalizeInvestment) ??
@@ -282,14 +289,24 @@ export function EarnDashboard() {
   const minUsd = settings?.minimum_investment_usd ?? 30;
   const durationDays = settings?.max_business_days ?? 20;
   const dailyReward = settings?.daily_reward_ngn ?? 0;
-  const roiPercent = settings?.roi_percent ?? selectedPlan?.roi_percent ?? 0;
-  const amount = selectedPlan?.minimum_amount ?? minUsd;
+  const settingsRoi = settings?.roi_percent ?? 0;
+  const referralPercent = settings?.referral_percent ?? 0;
+  const minReferrals = settings?.min_referrals_for_payout ?? 5;
+  const processingHours = settings?.withdrawal_processing_hours ?? 24;
+  const feePercent = settings?.early_withdrawal_fee_percent ?? 0;
+  const penaltyPercent = settings?.early_withdrawal_penalty_percent ?? 0;
+
+  React.useEffect(() => {
+    if (!calcAmount && minUsd) setCalcAmount(String(minUsd));
+  }, [minUsd, calcAmount]);
+
+  const amountUsd = Math.max(Number(calcAmount) || 0, 0);
   const calc = calculateInvestment({
-    amountUsd: amount,
+    amountUsd: Math.max(amountUsd, minUsd),
     exchangeRate: rate,
     dailyRewardNgn: dailyReward,
     durationBusinessDays: durationDays,
-    roiPercent: selectedPlan?.roi_percent ?? roiPercent,
+    roiPercent: settingsRoi,
   });
 
   const available =
@@ -297,14 +314,37 @@ export function EarnDashboard() {
     dashboard?.referral_info?.withdrawable_balance_ngn ??
     walletQ.data?.available_balance ??
     0;
-  const locked =
-    dashboard?.total_invested_ngn ?? walletQ.data?.locked_balance ?? 0;
-  const withdrawalBalance =
-    dashboard?.referral_info?.withdrawable_balance_ngn ?? available;
+  const locked = dashboard?.total_invested_ngn ?? walletQ.data?.locked_balance ?? 0;
+  const pendingWithdrawal = dashboard?.pending_withdrawal_ngn ?? 0;
   const early = investments.some((item) => item.status === "active");
   const activeInvestment = investments.find((item) => item.status === "active");
-  const daysRemaining = activeInvestment?.days_remaining;
-  const nextMaturity = activeInvestment?.matures_at;
+  const totalDays = activeInvestment?.lock_period_days || durationDays;
+  const daysRemaining = activeInvestment?.days_remaining ?? totalDays;
+  const completedDays = activeInvestment
+    ? getCompletedBusinessDays(daysRemaining, totalDays)
+    : 0;
+  const progress = activeInvestment
+    ? activeInvestment.progress_pct ?? getProgressPercentage(daysRemaining, totalDays)
+    : 0;
+  const remainingRewards = Math.max(0, (totalDays - completedDays) * dailyReward);
+  const totalEarnedFromActive = activeInvestment?.roi_cdt ?? dashboard?.today_earnings_ngn ?? 0;
+  const timeline = buildRewardTimeline(totalDays, dailyReward);
+  const withdrawalPreview = calculateWithdrawal(available, feePercent, penaltyPercent, early);
+  const referralTargetEarnings = calc.amountNgn * (referralPercent / 100) * minReferrals;
+
+  const rewards = rewardsQ.data ?? [];
+  const todayReward = dashboard?.today_earnings_ngn ?? 0;
+  const yesterdayReward = rewards.find((row) => {
+    const day = new Date(row.reward_date || row.created_at);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return day.toDateString() === yesterday.toDateString();
+  })?.amount_ngn;
+  const monthReward = dashboard?.monthly_earnings_ngn ?? 0;
+  const rewardClaimedToday = todayReward > 0;
+
+  const loading = dashboardQ.isLoading || rateQ.isLoading || settingsQ.isLoading;
+  const firstName = displayName(user).split(" ")[0] || "Investor";
 
   const savePrefs = (next: EarnPreferences) => {
     setPrefs(next);
@@ -313,12 +353,32 @@ export function EarnDashboard() {
     }
   };
 
-  const createPayment = async (provider: "paystack" | "flutterwave", investAmount: number) => {
+  const openInvest = (plan?: InvestmentPlan | null) => {
+    const resolved =
+      plan ??
+      plans.find((item) => item.enabled) ??
+      ({
+        id: "default",
+        name: "CoinDistro Plan",
+        minimum_amount: Math.max(amountUsd || minUsd, minUsd),
+        maximum_amount: minUsd * 100,
+        currency: "USD",
+        roi_percent: calc.roiPercent,
+        enabled: true,
+      } satisfies InvestmentPlan);
+    setSelectedPlan({
+      ...resolved,
+      minimum_amount: Math.max(amountUsd || resolved.minimum_amount || minUsd, minUsd),
+    });
+    setInvestOpen(true);
+  };
+
+  const createPayment = async (paymentProvider: "paystack" | "flutterwave", investAmount: number) => {
     setPaying(true);
     setPaymentError(null);
     try {
       const result =
-        provider === "paystack"
+        paymentProvider === "paystack"
           ? await investmentApi.initPaystackPayment(investAmount)
           : await investmentApi.initFlutterwavePayment(investAmount);
       if (!result.authorization_url) {
@@ -343,7 +403,6 @@ export function EarnDashboard() {
   const submitWithdrawal = async (withdrawAmount: number) => {
     setWithdrawing(true);
     try {
-      // Earnings balance withdrawal uses amount_ngn; investment_id is reserved for principal early/normal exits.
       await investmentApi.requestWithdrawal(undefined, withdrawAmount);
       setWithdrawOpen(false);
       await Promise.all([
@@ -355,444 +414,703 @@ export function EarnDashboard() {
     }
   };
 
-  const loading = dashboardQ.isLoading || rateQ.isLoading || settingsQ.isLoading;
-  const totalEarnings =
-    (dashboard?.monthly_earnings_ngn ?? 0) > 0
-      ? (dashboard?.monthly_earnings_ngn ?? 0) * 12
-      : investments.reduce((sum, item) => sum + (item.roi_cdt || 0), 0);
+  const activity = [
+    ...(paymentsQ.data ?? []).slice(0, 3).map((row) => ({
+      id: `pay-${row.id}`,
+      title: "Investment Created",
+      detail: `+$${row.amount_usd ?? 0}`,
+      status: row.status,
+      at: row.created_at,
+    })),
+    ...(rewardsQ.data ?? []).slice(0, 3).map((row) => ({
+      id: `rew-${row.id}`,
+      title: "Reward Credited",
+      detail: `+${formatCurrency(row.amount_ngn)}`,
+      status: row.status,
+      at: row.created_at,
+    })),
+    ...(withdrawalsQ.data ?? []).slice(0, 2).map((row) => ({
+      id: `wd-${row.id}`,
+      title: "Withdrawal Requested",
+      detail: formatCurrency(row.net_amount_ngn),
+      status: row.status,
+      at: row.created_at,
+    })),
+  ]
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 8);
 
-  const stats: Array<[string, string, React.ComponentType<{ className?: string }>]> = [
-    ["Portfolio value", formatCurrency(dashboard?.total_invested_ngn), Wallet],
-    ["Total invested", `$${dashboard?.total_invested_usd ?? 0}`, PiggyBank],
-    ["Today's earnings", formatCurrency(dashboard?.today_earnings_ngn), Sparkles],
-    ["Pending earnings", formatCurrency(dashboard?.pending_withdrawal_ngn), Clock3],
-    ["Total earnings", formatCurrency(totalEarnings), Gift],
-    ["Referral earnings", formatCurrency(dashboard?.referral_earnings_ngn), Gift],
-    ["Available balance", formatCurrency(available), Wallet],
-    ["Locked balance", formatCurrency(locked), PiggyBank],
-    ["Withdrawal balance", formatCurrency(withdrawalBalance), Wallet],
-    ["Days remaining", daysRemaining != null ? String(daysRemaining) : "—", Clock3],
-    ["Next payout", formatCurrency(activeInvestment ? dailyReward : 0), Sparkles],
-    ["Maturity date", formatDate(nextMaturity), Clock3],
-  ];
+  if (dashboard?.referral_earnings_ngn) {
+    activity.unshift({
+      id: "referral-lifetime",
+      title: "Referral Bonus",
+      detail: `+${formatCurrency(dashboard.referral_earnings_ngn)}`,
+      status: "paid",
+      at: new Date().toISOString(),
+    });
+  }
 
   return (
-    <div className="space-y-6 animate-cds-fade-in">
-      <PageHeader
-        title="Earn"
-        description="Invest, track daily rewards, and manage your portfolio."
-        actions={
-          <Button asChild size="sm">
+    <div className="relative space-y-6 animate-cds-fade-in pb-10">
+      <div className="pointer-events-none absolute inset-x-0 -top-6 h-72 rounded-3xl bg-gradient-to-br from-[#7C3AED]/25 via-[#06B6D4]/10 to-transparent blur-2xl" />
+
+      {/* ─── Hero Section ─────────────────────────────────── */}
+      <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-[#1a0b2e]/90 via-background to-[#0b1f33]/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="gap-1">
+                <Sparkles className="h-3 w-3 text-primary" />
+                {greetingForHour()}
+              </Badge>
+            </div>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              {firstName}’s Investment Portfolio
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Track capital, daily rewards, and withdrawals in one premium investment workspace.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm" className="backdrop-blur">
             <Link href="/app/dashboard">
-              <ArrowRight className="mr-2 h-4 w-4" /> Back to dashboard
+              <ArrowRight className="mr-2 h-4 w-4" /> Dashboard
             </Link>
           </Button>
-        }
-      />
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(([title, value, Icon]) => (
-          <StatCard
-            key={title}
-            title={title}
-            value={loading ? "…" : value}
-            description="Updated from your account"
-            icon={<Icon className="h-4 w-4" />}
-          />
-        ))}
-      </div>
+        <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
+          ) : (
+            <>
+              <MetricCard
+                title="Total Invested"
+                value={`$${dashboard?.total_invested_usd ?? 0}`}
+                numeric={dashboard?.total_invested_usd ?? 0}
+                prefix="$"
+                icon={PiggyBank}
+                accent="border-violet-500/30"
+                hint="Lifetime capital"
+              />
+              <MetricCard
+                title="Current Capital"
+                value={formatCurrency(locked)}
+                numeric={locked}
+                prefix="₦"
+                icon={Wallet}
+                accent="border-fuchsia-500/30"
+                hint="Locked in active plans"
+              />
+              <MetricCard title="Today’s Reward"
+                value={formatCurrency(todayReward || dailyReward)}
+                numeric={todayReward || dailyReward}
+                prefix="₦"
+                icon={Sparkles}
+                accent="border-amber-400/30"
+                hint="Business day credit"
+              />
+              <MetricCard
+                title="Total Earned"
+                value={formatCurrency(totalEarnedFromActive || monthReward)}
+                numeric={totalEarnedFromActive || monthReward}
+                prefix="₦"
+                icon={TrendingUp}
+                accent="border-emerald-400/30"
+                hint="Rewards credited"
+              />
+              <MetricCard
+                title="Referral Earnings"
+                value={formatCurrency(dashboard?.referral_earnings_ngn)}
+                numeric={dashboard?.referral_earnings_ngn ?? 0}
+                prefix="₦"
+                icon={Gift}
+                accent="border-cyan-400/30"
+                hint="Lifetime referrals"
+              />
+              <MetricCard
+                title="Current ROI"
+                value={formatRoi(calc.roiPercent)}
+                numeric={calc.roiPercent}
+                suffix="%"
+                icon={Zap}
+                accent="border-primary/40"
+                hint={`${durationDays} business days`}
+              />
+            </>
+          )}
+        </div>
+      </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <Card>
+      {/* ─── Calculator + Exchange Rate ───────────────────── */}
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+        <Card className="border-primary/15 bg-card/80 shadow-xl backdrop-blur">
           <CardHeader>
-            <CardTitle className="text-base">Investment plans</CardTitle>
+            <div className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Investment Calculator</CardTitle>
+            </div>
             <CardDescription>
-              Minimum investment is ${minUsd}. Values use the current exchange rate: 1 USD ={" "}
-              {formatCurrency(rate)}.
+              Live projections using your configured rate, daily reward, and duration. Minimum ${minUsd}.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            {plans.length ? (
-              plans
-                .filter((plan) => plan.enabled)
-                .map((plan) => {
-                  const projection = calculateInvestment({
-                    amountUsd: Math.max(plan.minimum_amount, minUsd),
-                    exchangeRate: rate,
-                    dailyRewardNgn: dailyReward,
-                    durationBusinessDays: durationDays,
-                    roiPercent: plan.roi_percent,
-                  });
-                  return (
-                    <div key={plan.id} className="rounded-lg border p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{plan.name}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {plan.description || "Flexible growth plan"}
-                          </p>
-                        </div>
-                        <Badge variant="success">Live</Badge>
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <span>
-                          USD
-                          <strong className="block">${plan.minimum_amount.toLocaleString()}</strong>
-                        </span>
-                        <span>
-                          NGN equivalent
-                          <strong className="block">
-                            {formatCurrency(plan.minimum_amount * rate)}
-                          </strong>
-                        </span>
-                        <span>
-                          ROI
-                          <strong className="block">{plan.roi_percent}%</strong>
-                        </span>
-                        <span>
-                          Duration
-                          <strong className="block">{durationDays} days</strong>
-                        </span>
-                        <span>
-                          Daily payout
-                          <strong className="block">{formatCurrency(dailyReward)}</strong>
-                        </span>
-                        <span>
-                          Total payout
-                          <strong className="block">
-                            {formatCurrency(projection.totalPayoutNgn)}
-                          </strong>
-                        </span>
-                      </div>
-                      <Button className="mt-4 w-full" onClick={() => setSelectedPlan(plan)}>
-                        Invest now
-                      </Button>
-                    </div>
-                  );
-                })
-            ) : (
-              <div className="rounded-lg border p-4 md:col-span-2">
-                <p className="font-semibold">Default investment plan</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Configured minimum of ${minUsd} with {durationDays} business days.
-                </p>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <span>
-                    USD<strong className="block">${minUsd}</strong>
-                  </span>
-                  <span>
-                    NGN equivalent
-                    <strong className="block">{formatCurrency(minUsd * rate)}</strong>
-                  </span>
-                  <span>
-                    ROI<strong className="block">{roiPercent}%</strong>
-                  </span>
-                  <span>
-                    Daily payout
-                    <strong className="block">{formatCurrency(dailyReward)}</strong>
-                  </span>
-                  <span>
-                    Monthly earnings
-                    <strong className="block">{formatCurrency(calc.monthlyEarningsNgn)}</strong>
-                  </span>
-                  <span>
-                    Total payout
-                    <strong className="block">{formatCurrency(calc.totalPayoutNgn)}</strong>
-                  </span>
-                </div>
-                <Button
-                  className="mt-4 w-full"
-                  onClick={() =>
-                    setSelectedPlan({
-                      id: "default",
-                      name: "Default plan",
-                      minimum_amount: minUsd,
-                      maximum_amount: minUsd * 100,
-                      currency: "USD",
-                      roi_percent: roiPercent,
-                      enabled: true,
-                    })
-                  }
-                >
-                  Invest now
-                </Button>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="calc-amount">Investment Amount (USD)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-semibold text-muted-foreground">$</span>
+                <Input
+                  id="calc-amount"
+                  type="number"
+                  min={minUsd}
+                  step="1"
+                  value={calcAmount}
+                  onChange={(e) => setCalcAmount(e.target.value)}
+                  className="h-12 pl-8 text-lg font-semibold"
+                />
               </div>
-            )}
+              {amountUsd > 0 && amountUsd < minUsd ? (
+                <p className="text-xs text-amber-600">Minimum investment is ${minUsd}.</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <StatTile label="USD" value={`$${(Math.max(amountUsd, minUsd) || 0).toLocaleString()}`} icon={Wallet} />
+              <StatTile label="NGN Equivalent" value={loading ? "…" : formatCurrency(calc.amountNgn)} icon={Landmark} accent="text-fuchsia-500" />
+              <StatTile label="Daily Earnings" value={loading ? "…" : formatCurrency(calc.dailyEarningsNgn)} icon={Sparkles} accent="text-amber-500" />
+              <StatTile label="Monthly Earnings" value={loading ? "…" : formatCurrency(calc.monthlyEarningsNgn)} icon={TrendingUp} accent="text-emerald-500" />
+              <StatTile label="ROI %" value={loading ? "…" : formatRoi(calc.roiPercent)} icon={Zap} accent="text-primary" />
+              <StatTile label="Total Withdrawal" value={loading ? "…" : formatCurrency(calc.totalPayoutNgn)} icon={Wallet} accent="text-cyan-500" />
+              <StatTile label="Business Days Remaining" value={loading ? "…" : String(calc.businessDaysRemaining)} icon={CalendarDays} accent="text-violet-500" />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button className="flex-1" size="lg" onClick={() => openInvest(null)}>
+                <ArrowUpRight className="mr-2 h-4 w-4" /> Invest Now
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => setWithdrawOpen(true)}>
+                <Lock className="mr-2 h-4 w-4" /> Withdraw
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Exchange Rate + Trust */}
+        <div className="space-y-6">
+          <Card className="overflow-hidden border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-card to-primary/10">
+            <CardContent className="space-y-3 p-6">
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" className="gap-1">
+                  <Zap className="h-3 w-3 text-cyan-500" /> Live Exchange Rate
+                </Badge>
+                <Badge variant="outline" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Updated Today
+                </Badge>
+              </div>
+              <div className="flex items-end gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">1 USD</p>
+                  <p className="text-3xl font-bold">=</p>
+                </div>
+                <p className="text-4xl font-bold tabular-nums text-primary">
+                  {loading || !rate ? "…" : formatCurrency(rate)}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Updated {rateQ.data?.updated_at ? formatDate(rateQ.data.updated_at) : "Today"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-500/20">
+            <CardHeader>
+              <CardTitle className="text-base">Why investors trust CoinDistro</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm">
+              {[
+                { label: "Capital Protected", icon: ShieldCheck },
+                { label: "Daily Rewards", icon: Sparkles },
+                { label: "24hr Withdrawal Processing", icon: Clock3 },
+                { label: "Secure Payments", icon: CreditCard },
+              ].map(({ label, icon: Icon }) => (
+                <div key={label} className="flex items-center gap-2 rounded-lg bg-emerald-500/5 px-3 py-2 transition hover:bg-emerald-500/10">
+                  <Icon className="h-4 w-4 text-emerald-500" />
+                  <span>{label}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ─── Progress + Daily Rewards ─────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-primary/15">
           <CardHeader>
-            <CardTitle className="text-base">Investment summary</CardTitle>
-            <CardDescription>Projected using configured rates — never hardcoded in the UI.</CardDescription>
+            <CardTitle className="text-base">Investment Progress</CardTitle>
+            <CardDescription>
+              {activeInvestment
+                ? `Day ${completedDays} / ${totalDays}`
+                : "Start an investment to unlock live progress tracking."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-semibold">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-3" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Remaining Days</p>
+                <p className="mt-1 text-lg font-semibold">{activeInvestment ? daysRemaining : "—"}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Expected Maturity</p>
+                <p className="mt-1 text-lg font-semibold">{formatDate(activeInvestment?.matures_at)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Total Earned</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(totalEarnedFromActive)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Remaining Rewards</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {formatCurrency(activeInvestment ? remainingRewards : 0)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-500/20">
+          <CardHeader>
+            <CardTitle className="text-base">Daily Rewards</CardTitle>
+            <CardDescription>Track today’s credit and upcoming payouts.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {[
-              ["Daily earnings", formatCurrency(calc.dailyEarningsNgn)],
-              ["Monthly earnings", formatCurrency(calc.monthlyEarningsNgn)],
-              ["ROI", `${calc.roiPercent}%`],
-              ["Total expected payout", formatCurrency(calc.totalPayoutNgn)],
-              ["Maturity window", `${durationDays} business days`],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between border-b pb-2 last:border-0">
-                <span className="text-muted-foreground">{label}</span>
-                <strong>{value}</strong>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border bg-amber-500/5 p-3">
+                <p className="text-xs text-muted-foreground">Today’s Reward</p>
+                <p className="mt-1 text-xl font-bold">{formatCurrency(todayReward || dailyReward)}</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle className="text-base">Your investments</CardTitle>
-            <CardDescription>
-              Progress, next payout, maturity date, days remaining, and status.
-            </CardDescription>
-          </div>
-          <Button variant="outline" onClick={() => setWithdrawOpen(true)}>
-            Request withdrawal
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {investments.length ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {investments.map((item) => (
-                <InvestmentCard
-                  key={item.id}
-                  investment={item}
-                  dailyRewardNgn={dailyReward}
-                />
-              ))}
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Yesterday</p>
+                <p className="mt-1 text-xl font-bold">
+                  {yesterdayReward != null ? `+${formatCurrency(yesterdayReward)}` : `+${formatCurrency(dailyReward)}`}
+                </p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">This Month</p>
+                <p className="mt-1 text-xl font-bold">{formatCurrency(monthReward)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Upcoming Reward</p>
+                <p className="mt-1 font-semibold">Tomorrow</p>
+                <p className="text-lg font-bold">{formatCurrency(dailyReward)}</p>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No investments yet. Choose a plan above to get started.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Referral rewards</CardTitle>
-            <CardDescription>Share your link and track referral earnings.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dashboard?.referral_info ? (
-              <>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <span>
-                    Referral code
-                    <strong className="block">{dashboard.referral_info.referral_code}</strong>
-                  </span>
-                  <span>
-                    Total referrals
-                    <strong className="block">{dashboard.referral_info.total_referrals}</strong>
-                  </span>
-                  <span>
-                    Active referrals
-                    <strong className="block">{dashboard.referral_info.active_referrals}</strong>
-                  </span>
-                  <span>
-                    Referral earnings
-                    <strong className="block">
-                      {formatCurrency(dashboard.referral_info.referral_earnings_ngn)}
-                    </strong>
-                  </span>
-                </div>
-                <Button variant="outline" className="mt-4" onClick={() => void copyReferral()}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copied ? "Copied" : "Copy referral link"}
-                </Button>
-              </>
+            {rewardClaimedToday ? (
+              <p className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" /> Today’s reward credited
+              </p>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Referral information is not available yet.
+              <p className="text-xs text-muted-foreground">
+                Rewards credit on business days once your investment is active.
               </p>
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Daily tasks</CardTitle>
-            <CardDescription>Reward activities coming soon.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span>Today&apos;s reward</span>
-              <strong>{formatCurrency(0)}</strong>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              Completed: 0
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock3 className="h-4 w-4 text-muted-foreground" />
-              Pending: Watch YouTube
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Future tasks will appear here when enabled. Backend logic is not implemented yet.
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-        <HistoryCard
-          title="Investment history"
-          rows={(paymentsQ.data ?? []).map((row) => ({ ...row }))}
-          amount={(row) => `$${row.amount_usd ?? 0} · ${formatCurrency(row.amount_ngn)}`}
-        />
-        <HistoryCard
-          title="Withdrawal history"
-          rows={(withdrawalsQ.data ?? []).map((row) => ({ ...row }))}
-          amount={(row) =>
-            `${formatCurrency(row.net_amount_ngn)} · fee ${formatCurrency(row.fee_ngn)}`
-          }
-        />
-        <HistoryCard
-          title="Daily rewards"
-          rows={(rewardsQ.data ?? []).map((row) => ({ ...row }))}
-          amount={(row) => formatCurrency(row.amount_ngn)}
-        />
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Referral rewards history</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Lifetime earnings</span>
-              <strong>{formatCurrency(dashboard?.referral_earnings_ngn)}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Active referrals</span>
-              <strong>{dashboard?.referral_info?.active_referrals ?? 0}</strong>
-            </div>
-            <Badge variant="secondary">Synced from referral wallet</Badge>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* ─── Timeline ─────────────────────────────────────── */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            <CardTitle className="text-base">Settings</CardTitle>
-          </div>
-          <CardDescription>
-            Investment preferences, notification preferences, and preferred payment method.
-          </CardDescription>
+          <CardTitle className="text-base">Investment Timeline</CardTitle>
+          <CardDescription>Completed days, current day, remaining days, then withdrawal.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-4">
-            <p className="text-sm font-medium">Investment preferences</p>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="auto-reinvest">Auto-reinvest matured capital</Label>
-              <Switch
-                id="auto-reinvest"
-                checked={prefs.autoReinvest}
-                onCheckedChange={(checked) => savePrefs({ ...prefs, autoReinvest: checked })}
-              />
+        <CardContent>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {timeline.map((item) => {
+              const done = activeInvestment ? item.day <= completedDays : false;
+              const current = activeInvestment ? item.day === completedDays + 1 : item.day === 1;
+              return (
+                <div
+                  key={item.day}
+                  className={`min-w-[4.5rem] rounded-xl border px-3 py-3 text-center text-xs transition ${
+                    done
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : current
+                        ? "border-primary bg-primary/15 text-primary shadow-md shadow-primary/20"
+                        : "border-border/60 text-muted-foreground"
+                  }`}
+                >
+                  <p className="font-semibold">Day {item.day}</p>
+                  <p className="mt-1">{done ? "✔" : current ? "●" : "○"}</p>
+                </div>
+              );
+            })}
+            <div className="min-w-[5.5rem] rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-3 text-center text-xs text-cyan-700 dark:text-cyan-300">
+              <p className="font-semibold">Withdrawal</p>
+              <p className="mt-1">Day {totalDays}+</p>
             </div>
-            <div className="space-y-2">
-              <Label>Configured minimum</Label>
-              <Input value={`$${minUsd}`} readOnly />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-sm font-medium">Notification preferences</p>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="notify-daily">Daily rewards</Label>
-              <Switch
-                id="notify-daily"
-                checked={prefs.notifyDailyRewards}
-                onCheckedChange={(checked) =>
-                  savePrefs({ ...prefs, notifyDailyRewards: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="notify-withdrawals">Withdrawals</Label>
-              <Switch
-                id="notify-withdrawals"
-                checked={prefs.notifyWithdrawals}
-                onCheckedChange={(checked) =>
-                  savePrefs({ ...prefs, notifyWithdrawals: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="notify-referrals">Referrals</Label>
-              <Switch
-                id="notify-referrals"
-                checked={prefs.notifyReferrals}
-                onCheckedChange={(checked) =>
-                  savePrefs({ ...prefs, notifyReferrals: checked })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-sm font-medium">Preferred payment method</p>
-            <Select
-              value={prefs.preferredPaymentMethod}
-              onValueChange={(value) =>
-                savePrefs({
-                  ...prefs,
-                  preferredPaymentMethod: value as EarnPreferences["preferredPaymentMethod"],
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="paystack">Paystack</SelectItem>
-                <SelectItem value="flutterwave">Flutterwave</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Used as the default provider when you open the payment modal.
-            </p>
           </div>
         </CardContent>
       </Card>
 
+      {/* ─── Payment + Withdrawal ─────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-base">Choose Payment Method</CardTitle>
+            <CardDescription>Secure checkout with Paystack or Flutterwave.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    id: "paystack" as const,
+                    name: "Paystack",
+                    description: "Cards, bank transfer & USSD",
+                    speed: "Instant redirect",
+                    recommended: true,
+                  },
+                  {
+                    id: "flutterwave" as const,
+                    name: "Flutterwave",
+                    description: "Cards & local payment rails",
+                    speed: "Fast checkout",
+                    recommended: false,
+                  },
+                ] as const
+              ).map((item) => {
+                const selected = provider === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setProvider(item.id);
+                      savePrefs({ ...prefs, preferredPaymentMethod: item.id });
+                    }}
+                    className={`rounded-2xl border p-4 text-left transition ${
+                      selected
+                        ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                        : "border-border/70 hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#06B6D4] text-sm font-bold text-white">
+                        {item.name.slice(0, 1)}
+                      </div>
+                      {item.recommended ? <Badge variant="success">Recommended</Badge> : null}
+                    </div>
+                    <p className="mt-3 font-semibold">{item.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                    <p className="mt-2 text-xs font-medium text-primary">{item.speed}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <Button className="w-full" size="lg" onClick={() => openInvest(null)}>
+              Invest Now · {provider === "paystack" ? "Paystack" : "Flutterwave"}
+            </Button>
+            {paymentError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {paymentError}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-500/20">
+          <CardHeader>
+            <CardTitle className="text-base">Withdrawal</CardTitle>
+            <CardDescription>Processing time: {processingHours} Hours</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Available Balance</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(available)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Locked Capital</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(locked)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Pending Withdrawal</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(pendingWithdrawal)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Withdrawal Fee</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(withdrawalPreview.fee)}</p>
+              </div>
+            </div>
+            {early ? (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200">
+                Early withdrawal incurs a penalty. Estimated deduction:{" "}
+                <strong>{formatCurrency(withdrawalPreview.deductions)}</strong>
+              </p>
+            ) : null}
+            <Button className="w-full" variant="outline" onClick={() => setWithdrawOpen(true)}>
+              <Lock className="mr-2 h-4 w-4" /> Request Withdrawal
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Referral + Activity ──────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-fuchsia-500/20 bg-gradient-to-br from-fuchsia-500/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="text-base">Referral Dashboard</CardTitle>
+            <CardDescription>
+              Invite {minReferrals} Friends · Earn {referralPercent}% · ≈ {formatCurrency(referralTargetEarnings)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex-1 rounded-xl border bg-background/70 px-4 py-3 font-mono text-sm">
+                {dashboard?.referral_info?.referral_code ?? user?.referral_code ?? "—"}
+              </div>
+              <Button variant="outline" onClick={() => void copyReferral()}>
+                <Copy className="mr-2 h-4 w-4" />
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Invited Users</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {dashboard?.referral_info?.total_referrals ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Qualified Referrals</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {dashboard?.referral_info?.active_referrals ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Pending Rewards</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(pendingWithdrawal)}</p>
+              </div>
+              <div className="rounded-xl border p-3">
+                <p className="text-xs text-muted-foreground">Paid Rewards</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {formatCurrency(dashboard?.referral_earnings_ngn)}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
+              <p className="text-muted-foreground">Lifetime Referral Earnings</p>
+              <p className="text-2xl font-bold">{formatCurrency(dashboard?.referral_earnings_ngn)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardDescription>Investments, rewards, referrals, and withdrawals.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {activity.length ? (
+              <div className="space-y-3">
+                {activity.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-3 transition hover:border-primary/30"
+                  >
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(item.at)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold tabular-nums">{item.detail}</p>
+                      <Badge variant={statusVariant(item.status)} className="mt-1 capitalize">
+                        {item.status.replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No activity yet. Make your first investment to begin.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Active investments list (compact) ────────────── */}
+      {investments.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Your Investments</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {investments.map((investment) => {
+              const pct =
+                investment.progress_pct ??
+                getProgressPercentage(
+                  investment.days_remaining ?? investment.lock_period_days,
+                  investment.lock_period_days,
+                );
+              return (
+                <div key={investment.id} className="rounded-2xl border p-4 transition hover:border-primary/30">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{investment.plan_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {investment.lock_period_days} business days
+                      </p>
+                    </div>
+                    <Badge variant={statusVariant(String(investment.status))} className="capitalize">
+                      {String(investment.status).replaceAll("_", " ")}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span>
+                      Capital<strong className="block">{formatCurrency(investment.amount_paid)}</strong>
+                    </span>
+                    <span>
+                      Earned<strong className="block">{formatCurrency(investment.roi_cdt)}</strong>
+                    </span>
+                  </div>
+                  {investment.status === "active" ? (
+                    <div className="mt-3">
+                      <Progress value={pct} />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ─── Collapsible settings ─────────────────────────── */}
+      <Card className="border-dashed">
+        <CardHeader className="cursor-pointer" onClick={() => setSettingsOpen((open) => !open)}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              <CardTitle className="text-base">Preferences</CardTitle>
+            </div>
+            <Badge variant="outline">{settingsOpen ? "Hide" : "Show"}</Badge>
+          </div>
+          <CardDescription>Notifications, preferred payment, and auto-reinvest.</CardDescription>
+        </CardHeader>
+        {settingsOpen ? (
+          <CardContent className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-4">
+              <p className="text-sm font-medium">Investment</p>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="auto-reinvest">Auto-reinvest matured capital</Label>
+                <Switch
+                  id="auto-reinvest"
+                  checked={prefs.autoReinvest}
+                  onCheckedChange={(checked) => savePrefs({ ...prefs, autoReinvest: checked })}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm font-medium">Notifications</p>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="notify-daily">Daily rewards</Label>
+                <Switch
+                  id="notify-daily"
+                  checked={prefs.notifyDailyRewards}
+                  onCheckedChange={(checked) => savePrefs({ ...prefs, notifyDailyRewards: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="notify-withdrawals">Withdrawals</Label>
+                <Switch
+                  id="notify-withdrawals"
+                  checked={prefs.notifyWithdrawals}
+                  onCheckedChange={(checked) => savePrefs({ ...prefs, notifyWithdrawals: checked })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="notify-referrals">Referrals</Label>
+                <Switch
+                  id="notify-referrals"
+                  checked={prefs.notifyReferrals}
+                  onCheckedChange={(checked) => savePrefs({ ...prefs, notifyReferrals: checked })}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm font-medium">Preferred payment</p>
+              <Select
+                value={prefs.preferredPaymentMethod}
+                onValueChange={(value) => {
+                  const next = value as EarnPreferences["preferredPaymentMethod"];
+                  setProvider(next);
+                  savePrefs({ ...prefs, preferredPaymentMethod: next });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paystack">Paystack</SelectItem>
+                  <SelectItem value="flutterwave">Flutterwave</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        ) : null}
+      </Card>
+
+      {/* ─── Trust badges ─────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <ShieldCheck className="h-3.5 w-3.5" /> Capital Protected
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Sparkles className="h-3.5 w-3.5" /> Daily Rewards
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock3 className="h-3.5 w-3.5" /> {processingHours}hr Withdrawals
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Wallet className="h-3.5 w-3.5" /> Secure Payments
+        </span>
+      </div>
+
       <InvestmentPaymentModal
-        open={!!selectedPlan}
+        open={investOpen && !!selectedPlan}
         planName={selectedPlan?.name}
         exchangeRate={rate}
         minimumAmount={minUsd}
-        defaultAmount={selectedPlan?.minimum_amount ?? minUsd}
-        preferredProvider={prefs.preferredPaymentMethod}
-        roiPercent={selectedPlan?.roi_percent ?? roiPercent}
+        defaultAmount={selectedPlan?.minimum_amount ?? Math.max(amountUsd, minUsd)}
+        preferredProvider={provider}
+        roiPercent={calc.roiPercent}
         durationDays={durationDays}
         dailyRewardNgn={dailyReward}
         isSubmitting={paying}
         onClose={() => {
+          setInvestOpen(false);
           setSelectedPlan(null);
           setPaymentError(null);
         }}
         onConfirm={createPayment}
       />
-      {paymentError && selectedPlan && (
-        <p className="text-sm text-destructive" role="alert">
-          {paymentError}
-        </p>
-      )}
 
       <WithdrawalRequestModal
         open={withdrawOpen}
         availableBalance={available}
-        processingHours={settings?.withdrawal_processing_hours ?? 24}
-        feePercent={settings?.early_withdrawal_fee_percent ?? 0}
-        penaltyPercent={settings?.early_withdrawal_penalty_percent ?? 0}
+        processingHours={processingHours}
+        feePercent={feePercent}
+        penaltyPercent={penaltyPercent}
         earlyWithdrawal={early}
         isSubmitting={withdrawing}
         onClose={() => setWithdrawOpen(false)}

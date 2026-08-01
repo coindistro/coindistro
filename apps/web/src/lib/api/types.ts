@@ -146,6 +146,7 @@ export interface InvestmentSummary {
   allocated_cdt: number;
   roi_cdt: number;
   roi_percent: number;
+  daily_reward_ngn?: number;
   status: InvestmentStatus;
   lock_period_days: number;
   days_remaining?: number;

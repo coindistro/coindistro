@@ -18,9 +18,13 @@ export {
 export {
   calculateInvestment,
   calculateWithdrawal,
+  deriveRoiPercent,
   formatCurrency,
+  formatRoi,
   getProgressPercentage,
+  getCompletedBusinessDays,
   buildRewardTimeline,
+  greetingForHour,
 } from "./utils";
 
 export { EarnDashboard } from "./earn-dashboard";
