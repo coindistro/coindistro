@@ -19,6 +19,9 @@ import (
 	"github.com/coindistro/backend/internal/cache"
 	"github.com/coindistro/backend/internal/config"
 	"github.com/coindistro/backend/internal/database"
+	earningshandlers "github.com/coindistro/backend/internal/earnings/handlers"
+	earningsservice "github.com/coindistro/backend/internal/earnings/service"
+	earningsstore "github.com/coindistro/backend/internal/earnings/store"
 	"github.com/coindistro/backend/internal/email"
 	"github.com/coindistro/backend/internal/events"
 	"github.com/coindistro/backend/internal/featureflags"
@@ -28,9 +31,6 @@ import (
 	investhandlers "github.com/coindistro/backend/internal/investments/handlers"
 	investservice "github.com/coindistro/backend/internal/investments/service"
 	investstore "github.com/coindistro/backend/internal/investments/store"
-	earningshandlers "github.com/coindistro/backend/internal/earnings/handlers"
-	earningsservice "github.com/coindistro/backend/internal/earnings/service"
-	earningsstore "github.com/coindistro/backend/internal/earnings/store"
 	"github.com/coindistro/backend/internal/logger"
 	"github.com/coindistro/backend/internal/metrics"
 	"github.com/coindistro/backend/internal/rbac"
@@ -303,12 +303,46 @@ func New(cfg *config.Config) (*Server, error) {
 	var earningsSvc *earningsservice.Service
 	var earningsHandlers *earningshandlers.Handlers
 
-	// Read API keys from config
+	// Read API keys from config (read directly from env because these are
+	// secrets not modeled in the viper Config struct).
 	paystackSecretKey := os.Getenv("COINDISTRO_PAYSTACK_SECRET_KEY")
 	paystackPublicKey := os.Getenv("COINDISTRO_PAYSTACK_PUBLIC_KEY")
 	flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
 	flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
 	flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
+
+	// Startup-time validation: fail fast with a descriptive warning instead of
+	// only returning 503 EARNINGS_GATEWAY_NOT_CONFIGURED when a user hits
+	// /api/v1/investments/paystack/init. Missing keys mean payment init will
+	// fail for every caller.
+	if paystackSecretKey == "" {
+		log.Warn("payment gateway not configured: COINDISTRO_PAYSTACK_SECRET_KEY is empty",
+			zap.String("env_var", "COINDISTRO_PAYSTACK_SECRET_KEY"),
+			zap.String("impact", "POST /api/v1/investments/paystack/init and POST /api/v1/payments/paystack/init will return 503 EARNINGS_GATEWAY_NOT_CONFIGURED"),
+		)
+	}
+	if paystackPublicKey == "" {
+		log.Warn("payment gateway not configured: COINDISTRO_PAYSTACK_PUBLIC_KEY is empty",
+			zap.String("env_var", "COINDISTRO_PAYSTACK_PUBLIC_KEY"),
+		)
+	}
+	if flutterwaveSecretKey == "" {
+		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_SECRET_KEY is empty",
+			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_SECRET_KEY"),
+			zap.String("impact", "POST /api/v1/investments/flutterwave/init and POST /api/v1/payments/flutterwave/init will return 503 EARNINGS_GATEWAY_NOT_CONFIGURED"),
+		)
+	}
+	if flutterwavePublicKey == "" {
+		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_PUBLIC_KEY is empty",
+			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_PUBLIC_KEY"),
+		)
+	}
+	if flutterwaveSecretHash == "" {
+		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_SECRET_HASH is empty",
+			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_SECRET_HASH"),
+			zap.String("impact", "Flutterwave webhook signature verification will fail"),
+		)
+	}
 
 	investmentCfg := investservice.Config{
 		BaseURL:               cfg.App.BaseURL,
