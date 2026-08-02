@@ -55,6 +55,19 @@ export function InvestmentPaymentModal({
     setProvider(preferredProvider);
   }, [defaultAmount, open, preferredProvider]);
 
+  const PAYSTACK_PAYMENT_LINK = "https://paystack.shop/pay/coindistro";
+
+  const handlePaystackClick = React.useCallback(() => {
+    // TODO:
+    // Restore API-based Paystack initialization
+    // after payment gateway integration is completed.
+    // Current implementation uses hosted Paystack Payment Link.
+    const popup = window.open(PAYSTACK_PAYMENT_LINK, "_blank");
+    if (!popup) {
+      window.location.href = PAYSTACK_PAYMENT_LINK;
+    }
+  }, []);
+
   const resolvedAmount = Number(amount);
   const equivalentNgn = Number.isFinite(resolvedAmount) ? resolvedAmount * exchangeRate : 0;
   const valid = Number.isFinite(resolvedAmount) && resolvedAmount >= minimumAmount;
@@ -80,7 +93,7 @@ export function InvestmentPaymentModal({
                 type="button"
                 variant={provider === "paystack" ? "primary" : "outline"}
                 onClick={() => setProvider("paystack")}
-                disabled={isSubmitting}
+                disabled
               >
                 Paystack
               </Button>
@@ -88,11 +101,12 @@ export function InvestmentPaymentModal({
                 type="button"
                 variant={provider === "flutterwave" ? "primary" : "outline"}
                 onClick={() => setProvider("flutterwave")}
-                disabled={isSubmitting}
+                disabled
               >
                 Flutterwave
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">Temporarily using hosted Paystack payment link.</p>
           </div>
 
           <div className="space-y-2">
@@ -148,7 +162,20 @@ export function InvestmentPaymentModal({
               <span className="font-medium">Secure checkout</span>
             </div>
             <p className="mt-1">
-              You will be redirected to {provider === "paystack" ? "Paystack" : "Flutterwave"} to complete payment.
+              You will be redirected to Paystack to complete payment.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-info/40 bg-info/10 p-4 text-sm text-info">
+            <p className="font-medium">Payment Processing Notice</p>
+            <p className="mt-1">
+              After completing your payment, your CoinDistro wallet will be credited manually within <strong>24 hours</strong> after payment confirmation.
+            </p>
+            <p className="mt-1">
+              Please ensure you use the same email address associated with your CoinDistro account when making payment.
+            </p>
+            <p className="mt-1">
+              This is a temporary payment process while automated wallet funding is being finalized.
             </p>
           </div>
 
@@ -168,10 +195,10 @@ export function InvestmentPaymentModal({
           </Button>
           <Button
             type="button"
-            onClick={() => void onConfirm(provider, resolvedAmount)}
-            disabled={isSubmitting || !valid}
+            onClick={handlePaystackClick}
+            disabled={!valid}
           >
-            {isSubmitting ? "Processing..." : "Continue to payment"}
+            Pay with Paystack
           </Button>
         </DialogFooter>
       </DialogContent>
