@@ -26,6 +26,7 @@ interface InvestmentPaymentModalProps {
   durationDays?: number;
   dailyRewardNgn?: number;
   isSubmitting: boolean;
+  error?: string | null;
   onClose: () => void;
   onConfirm: (provider: "paystack" | "flutterwave", amount: number) => Promise<void> | void;
 }
@@ -41,6 +42,7 @@ export function InvestmentPaymentModal({
   durationDays,
   dailyRewardNgn,
   isSubmitting,
+  error,
   onClose,
   onConfirm,
 }: InvestmentPaymentModalProps) {
@@ -149,6 +151,15 @@ export function InvestmentPaymentModal({
               You will be redirected to {provider === "paystack" ? "Paystack" : "Flutterwave"} to complete payment.
             </p>
           </div>
+
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {error}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

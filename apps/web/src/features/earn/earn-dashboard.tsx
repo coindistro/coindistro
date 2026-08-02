@@ -1307,6 +1307,7 @@ export function EarnDashboard() {
         durationDays={durationDays}
         dailyRewardNgn={dailyReward}
         isSubmitting={paying}
+        error={paymentError}
         onClose={() => {
           setInvestOpen(false);
           setSelectedPlan(null);
