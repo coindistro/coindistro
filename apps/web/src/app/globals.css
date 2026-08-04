@@ -2,6 +2,27 @@
 
 @tailwind utilities;
 
+/* CoinDistro Premium Earn theme — extends CDS tokens for the earn experience */
+:root[class~="dark"],
+.dark {
+  --cds-background: 245 30% 4%; /* #07070B */
+  --cds-foreground: 210 40% 98%;
+  --cds-surface: 240 15% 7%; /* #111117 */
+  --cds-card: 240 15% 7%; /* #111117 */
+  --cds-card-foreground: 210 40% 98%;
+  --cds-popover: 240 15% 8%;
+  --cds-popover-foreground: 210 40% 98%;
+  --cds-muted: 240 10% 12%;
+  --cds-muted-foreground: 215 16% 65%;
+  --cds-accent: 263 40% 16%;
+  --cds-accent-foreground: 263 80% 85%;
+  --cds-border: 240 12% 16%; /* #222230 */
+  --cds-input: 240 12% 16%;
+  --cds-ring: 263 70% 62%;
+  --cds-radius: 1.125rem; /* 18px */
+  --cds-shadow-glow: 0 0 48px hsl(263 70% 58% / 0.35);
+}
+
 /* App-level utilities (landing glass effects preserved) */
 @layer utilities {
   .gradient-text {
@@ -30,5 +51,62 @@
 
   .glow-purple {
     box-shadow: var(--cds-shadow-glow);
+  }
+
+  /* Premium surface for earn screens */
+  .earn-surface {
+    background: linear-gradient(180deg, hsl(240 15% 7%) 0%, hsl(245 30% 5%) 100%);
+    border: 1px solid hsl(var(--cds-border));
+    border-radius: 1.125rem;
+  }
+
+  .earn-card-hover {
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .earn-card-hover:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--cds-primary) / 0.4);
+    box-shadow: 0 8px 32px -8px hsl(263 70% 58% / 0.2);
+  }
+
+  /* Animated shimmer for premium loading */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background: hsl(var(--cds-muted) / 0.4);
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--cds-primary) / 0.08) 50%,
+      transparent 100%
+    );
+    animation: cds-shimmer 1.8s infinite;
+  }
+  @keyframes cds-shimmer {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Slow pulse for gradient accents */
+  .pulse-slow {
+    animation: cds-pulse 3s ease-in-out infinite;
+  }
+  @keyframes cds-pulse {
+    0%,
+    100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 }
