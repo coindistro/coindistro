@@ -862,6 +862,205 @@ func (s *Service) processDailyReward(ctx context.Context, inv *models.EarningsIn
 	return nil
 }
 
+// ─── Genesis pool profit credit (auditable earnings engine) ─
+
+const (
+	// PoolSeedRewardStatus marks one-time pool profit credits for idempotency.
+	PoolSeedRewardStatus = "pool_seed"
+	// GenesisPoolInvestmentUSD is the capital tier for the $30 Genesis pool.
+	GenesisPoolInvestmentUSD = 30.0
+	// GenesisPoolTotalUSD is the total profit pool to distribute.
+	GenesisPoolTotalUSD = 500.0
+	// GenesisPoolInvestors is the number of investors sharing the pool.
+	GenesisPoolInvestors = 8
+	// GenesisPoolProfitPerInvestorUSD = 500 / 8
+	GenesisPoolProfitPerInvestorUSD = 62.5
+	// DefaultMinReferralsForWithdraw unlocks withdrawals after N successful referrals.
+	DefaultMinReferralsForWithdraw = 5
+)
+
+// SeedGenesisPoolProfits credits each active $30 Genesis investor their equal
+// share of the $500 profit pool ($62.50) through the normal earnings path:
+// investment_rewards ledger, investment totals, wallet transaction, audit,
+// notification, and activity event. Idempotent per investment.
+func (s *Service) SeedGenesisPoolProfits(ctx context.Context) (*models.SeedPoolCreditSummary, error) {
+	return s.SeedPoolProfits(ctx, GenesisPoolInvestmentUSD, GenesisPoolProfitPerInvestorUSD, GenesisPoolInvestors, GenesisPoolTotalUSD)
+}
+
+// SeedPoolProfits distributes a fixed profit_usd to each active investment matching investmentUSD.
+func (s *Service) SeedPoolProfits(
+	ctx context.Context,
+	investmentUSD, profitPerInvestorUSD float64,
+	maxInvestors int,
+	poolUSD float64,
+) (*models.SeedPoolCreditSummary, error) {
+	if !s.hasStore() {
+		return nil, errors.ErrSettingsNotFound
+	}
+	if profitPerInvestorUSD <= 0 || investmentUSD <= 0 {
+		return nil, errors.ErrInvalidAmount
+	}
+
+	rate, err := s.store.GetExchangeRate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	exchangeRate := 1400.0
+	if rate != nil && rate.USDTNGN > 0 {
+		exchangeRate = rate.USDTNGN
+	}
+
+	investments, err := s.store.ListActiveInvestmentsByAmountUSD(ctx, investmentUSD, maxInvestors)
+	if err != nil {
+		return nil, err
+	}
+
+	summary := &models.SeedPoolCreditSummary{
+		InvestorsTargeted: len(investments),
+		ProfitPerInvestor: profitPerInvestorUSD,
+		PoolUSD:           poolUSD,
+		ExchangeRate:      exchangeRate,
+		Results:           make([]models.SeedPoolCreditResult, 0, len(investments)),
+	}
+
+	profitNGN := profitPerInvestorUSD * exchangeRate
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+
+	for _, inv := range investments {
+		result := models.SeedPoolCreditResult{
+			UserID:       inv.UserID,
+			InvestmentID: inv.ID,
+			AmountUSD:    inv.AmountUSD,
+			ProfitUSD:    profitPerInvestorUSD,
+			ProfitNGN:    profitNGN,
+			PortfolioUSD: inv.AmountUSD + profitPerInvestorUSD,
+		}
+
+		exists, err := s.store.HasRewardWithStatus(ctx, inv.ID, PoolSeedRewardStatus)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			result.AlreadyCredited = true
+			summary.InvestorsSkipped++
+			summary.Results = append(summary.Results, result)
+			continue
+		}
+
+		// Avoid unique (investment_id, reward_date) collision with a daily reward.
+		rewardDate := today
+		if existing, _ := s.store.GetRewardByDate(ctx, inv.ID, rewardDate); existing != nil {
+			rewardDate = today.AddDate(0, 0, 1)
+		}
+
+		// Business day number uses a high sentinel so it does not collide with 1..20 daily days.
+		businessDay := inv.PaidBusinessDays + 100
+		if businessDay < 100 {
+			businessDay = 100
+		}
+
+		reward := &models.InvestmentReward{
+			InvestmentID:      inv.ID,
+			UserID:            inv.UserID,
+			AmountNGN:         profitNGN,
+			RewardDate:        rewardDate,
+			BusinessDayNumber: businessDay,
+			Status:            PoolSeedRewardStatus,
+		}
+		rewardID, err := s.store.CreateRewardReturning(ctx, reward)
+		if err != nil {
+			// Fallback to non-returning insert
+			if err2 := s.store.CreateReward(ctx, reward); err2 != nil {
+				s.logger.Error("failed to create pool reward",
+					zap.String("investment_id", inv.ID),
+					zap.Error(err2),
+				)
+				return nil, err2
+			}
+			rewardID = ""
+		}
+		result.RewardID = rewardID
+
+		// Update investment earned totals (earnings engine source of truth).
+		inv.TotalEarnedNGN += profitNGN
+		inv.UpdatedAt = time.Now().UTC()
+		if err := s.store.UpdateInvestment(ctx, inv); err != nil {
+			return nil, err
+		}
+
+		// Wallet ledger (NGN available) + wallet_transactions — not a fake balance:
+		// mirrors the credited reward amount on the multi-currency wallet.
+		walletID, _, _, werr := s.store.GetOrCreateCurrencyWallet(ctx, inv.UserID, "NGN")
+		if werr == nil && walletID != "" {
+			ref := fmt.Sprintf("POOL-%s", inv.ID[:8])
+			desc := fmt.Sprintf("Genesis pool profit $%.2f (₦%.2f) for investment %s", profitPerInvestorUSD, profitNGN, inv.ID)
+			if err := s.store.CreditWalletAvailable(ctx, walletID, profitNGN, "reward", ref, desc); err != nil {
+				s.logger.Warn("wallet credit failed (reward ledger still recorded)",
+					zap.String("user_id", inv.UserID),
+					zap.Error(err),
+				)
+			} else {
+				s.logger.Info("Wallet credited",
+					zap.String("user_id", inv.UserID),
+					zap.String("wallet_id", walletID),
+					zap.Float64("amount_ngn", profitNGN),
+				)
+			}
+		}
+
+		// Audit log
+		s.audit(ctx, inv.UserID, audit.ActionEarningsCredited, "earnings_investment", inv.ID, map[string]interface{}{
+			"type":           "genesis_pool_seed",
+			"profit_usd":     profitPerInvestorUSD,
+			"profit_ngn":     profitNGN,
+			"exchange_rate":  exchangeRate,
+			"portfolio_usd":  inv.AmountUSD + profitPerInvestorUSD,
+			"reward_status":  PoolSeedRewardStatus,
+			"reward_id":      rewardID,
+			"investment_usd": inv.AmountUSD,
+		})
+
+		// Earning history notification / activity feed
+		s.createNotification(ctx, inv.UserID, "pool_profit_credited",
+			"Genesis Profit Credited",
+			fmt.Sprintf("You earned $%.2f (₦%.2f) profit on your $%.2f Genesis investment. Portfolio value: $%.2f.",
+				profitPerInvestorUSD, profitNGN, inv.AmountUSD, inv.AmountUSD+profitPerInvestorUSD),
+			map[string]interface{}{
+				"investment_id": inv.ID,
+				"profit_usd":    profitPerInvestorUSD,
+				"profit_ngn":    profitNGN,
+				"portfolio_usd": inv.AmountUSD + profitPerInvestorUSD,
+			})
+
+		_ = s.store.InsertActivityEvent(ctx, inv.UserID, "earnings.pool_credited", map[string]interface{}{
+			"investment_id": inv.ID,
+			"profit_usd":    fmt.Sprintf("%.2f", profitPerInvestorUSD),
+			"profit_ngn":    fmt.Sprintf("%.2f", profitNGN),
+		})
+
+		s.publish("earnings.pool_credited", map[string]interface{}{
+			"user_id":       inv.UserID,
+			"investment_id": inv.ID,
+			"profit_usd":    profitPerInvestorUSD,
+			"profit_ngn":    profitNGN,
+		})
+
+		s.logger.Info("Genesis pool profit credited",
+			zap.String("user_id", inv.UserID),
+			zap.String("investment_id", inv.ID),
+			zap.Float64("profit_usd", profitPerInvestorUSD),
+			zap.Float64("profit_ngn", profitNGN),
+			zap.Float64("portfolio_usd", inv.AmountUSD+profitPerInvestorUSD),
+		)
+
+		summary.InvestorsCredited++
+		summary.TotalProfitUSD += profitPerInvestorUSD
+		summary.Results = append(summary.Results, result)
+	}
+
+	return summary, nil
+}
+
 // ─── Withdrawal Processing ───────────────────────────────
 
 // defaultWithdrawalInterval is the fallback lock between withdrawal requests (7 days).
@@ -874,6 +1073,19 @@ func (s *Service) RequestWithdrawal(ctx context.Context, userID string, req *mod
 	}
 	if settings == nil {
 		return nil, errors.ErrSettingsNotFound
+	}
+
+	// Referral unlock gate: withdrawals_unlocked = successful_referrals >= min (default 5).
+	minRefs := settings.MinReferralsForPayout
+	if minRefs <= 0 {
+		minRefs = DefaultMinReferralsForWithdraw
+	}
+	activeRefs, err := s.store.CountSuccessfulReferrals(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if activeRefs < minRefs {
+		return nil, errors.ErrReferralsRequired
 	}
 
 	// Enforce the one-withdrawal-every-N-days rule (default 7).
@@ -1249,23 +1461,46 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 		lastWithdrawalAt = &last.CreatedAt
 	}
 
+	settings, _ := s.store.GetSettings(ctx)
+	minRefs := DefaultMinReferralsForWithdraw
+	if settings != nil && settings.MinReferralsForPayout > 0 {
+		minRefs = settings.MinReferralsForPayout
+	}
+	successfulRefs, _ := s.store.CountSuccessfulReferrals(ctx, userID)
+	remainingRefs := minRefs - successfulRefs
+	if remainingRefs < 0 {
+		remainingRefs = 0
+	}
+	unlocked := successfulRefs >= minRefs
+	lockMsg := ""
+	if !unlocked {
+		lockMsg = fmt.Sprintf("Complete %d successful referrals to unlock your earnings.", minRefs)
+	}
+
 	dash := &models.EarningsDashboard{
-		TotalInvestedUSD:     0,
-		TotalInvestedNGN:     0,
-		ExchangeRate:         exchangeRate,
-		TodayEarningsNGN:     todayEarnings,
-		MonthlyEarningsNGN:   monthlyEarnings,
-		AvailableBalanceNGN:  totalEarnings - pendingWithdrawals,
-		PendingWithdrawalNGN: pendingWithdrawals,
-		ReferralEarningsNGN:  referralEarnings,
-		LastWithdrawalAt:     lastWithdrawalAt,
+		TotalInvestedUSD:       0,
+		TotalInvestedNGN:       0,
+		ExchangeRate:           exchangeRate,
+		TodayEarningsNGN:       todayEarnings,
+		MonthlyEarningsNGN:     monthlyEarnings,
+		AvailableBalanceNGN:    totalEarnings - pendingWithdrawals,
+		PendingWithdrawalNGN:   pendingWithdrawals,
+		ReferralEarningsNGN:    referralEarnings,
+		LastWithdrawalAt:       lastWithdrawalAt,
+		WithdrawalsUnlocked:    unlocked,
+		WithdrawalLockMessage:  lockMsg,
+		ActiveReferrals:        successfulRefs,
+		MinReferralsRequired:   minRefs,
+		RemainingReferrals:     remainingRefs,
 	}
 
 	var summaries []*models.EarningsSummary
+	totalProfitNGN := 0.0
 
 	for _, inv := range investments {
 		dash.TotalInvestedUSD += inv.AmountUSD
 		dash.TotalInvestedNGN += inv.AmountNGN
+		totalProfitNGN += inv.TotalEarnedNGN
 
 		switch inv.Status {
 		case models.InvestmentStatusActive:
@@ -1274,20 +1509,31 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 			dash.CompletedInvestments++
 		}
 
+		rateInv := inv.ExchangeRate
+		if rateInv <= 0 {
+			rateInv = exchangeRate
+		}
+		earnedUSD := 0.0
+		if rateInv > 0 {
+			earnedUSD = inv.TotalEarnedNGN / rateInv
+		}
+
 		summary := &models.EarningsSummary{
-			ID:               inv.ID,
-			AmountUSD:        inv.AmountUSD,
-			AmountNGN:        inv.AmountNGN,
-			ExchangeRate:     inv.ExchangeRate,
-			DailyRewardNGN:   inv.DailyRewardNGN,
-			PaidBusinessDays: inv.PaidBusinessDays,
-			MaxBusinessDays:  inv.MaxBusinessDays,
-			TotalEarnedNGN:   inv.TotalEarnedNGN,
-			TotalPendingNGN:  inv.TotalPendingNGN,
-			Status:           inv.Status,
-			MaturityDate:     inv.MaturityDate,
-			StartedAt:        inv.StartedAt,
-			CreatedAt:        inv.CreatedAt,
+			ID:                inv.ID,
+			AmountUSD:         inv.AmountUSD,
+			AmountNGN:         inv.AmountNGN,
+			ExchangeRate:      inv.ExchangeRate,
+			DailyRewardNGN:    inv.DailyRewardNGN,
+			PaidBusinessDays:  inv.PaidBusinessDays,
+			MaxBusinessDays:   inv.MaxBusinessDays,
+			TotalEarnedNGN:    inv.TotalEarnedNGN,
+			TotalEarnedUSD:    earnedUSD,
+			TotalPendingNGN:   inv.TotalPendingNGN,
+			PortfolioValueUSD: inv.AmountUSD + earnedUSD,
+			Status:            inv.Status,
+			MaturityDate:      inv.MaturityDate,
+			StartedAt:         inv.StartedAt,
+			CreatedAt:         inv.CreatedAt,
 		}
 
 		if inv.MaturityDate != nil && inv.Status == models.InvestmentStatusActive {
@@ -1308,22 +1554,39 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 	}
 
 	dash.Investments = summaries
+	dash.TotalProfitNGN = totalProfitNGN
+	if exchangeRate > 0 {
+		dash.TotalProfitUSD = totalProfitNGN / exchangeRate
+	}
+	// Prefer sum of rewards ledger if investment totals lag
+	if totalEarnings > totalProfitNGN {
+		dash.TotalProfitNGN = totalEarnings
+		if exchangeRate > 0 {
+			dash.TotalProfitUSD = totalEarnings / exchangeRate
+		}
+	}
+	dash.PortfolioValueUSD = dash.TotalInvestedUSD + dash.TotalProfitUSD
+	dash.PortfolioValueNGN = dash.TotalInvestedNGN + dash.TotalProfitNGN
 
 	// Get referral info
 	referralInfo := &models.ReferralInfo{
 		ReferralCode:           "",
 		ReferralLink:           "",
 		TotalReferrals:         0,
-		ActiveReferrals:        0,
+		ActiveReferrals:        successfulRefs,
 		ReferralEarningsNGN:    referralEarnings,
-		WithdrawableBalanceNGN: referralEarnings,
-		MinimumTarget:          5,
+		WithdrawableBalanceNGN: 0,
+		MinimumTarget:          minRefs,
+	}
+	if unlocked {
+		referralInfo.WithdrawableBalanceNGN = dash.AvailableBalanceNGN
 	}
 
 	totalRefs, _ := s.store.CountReferralsByReferrer(ctx, userID)
-	activeRefs, _ := s.store.CountActiveReferralsByReferrer(ctx, userID)
 	referralInfo.TotalReferrals = totalRefs
-	referralInfo.ActiveReferrals = activeRefs
+	if referralInfo.TotalReferrals < successfulRefs {
+		referralInfo.TotalReferrals = successfulRefs
+	}
 
 	dash.ReferralInfo = referralInfo
 

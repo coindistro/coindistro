@@ -265,6 +265,12 @@ type AdminWithdrawalActionRequest struct {
 type EarningsDashboard struct {
 	TotalInvestedUSD     float64 `json:"total_invested_usd"`
 	TotalInvestedNGN     float64 `json:"total_invested_ngn"`
+	// PortfolioValue = capital invested + total profit (earnings).
+	PortfolioValueUSD float64 `json:"portfolio_value_usd"`
+	PortfolioValueNGN float64 `json:"portfolio_value_ngn"`
+	// TotalProfit is lifetime investment rewards credited to the investor.
+	TotalProfitUSD       float64 `json:"total_profit_usd"`
+	TotalProfitNGN       float64 `json:"total_profit_ngn"`
 	TodayEarningsNGN     float64 `json:"today_earnings_ngn"`
 	MonthlyEarningsNGN   float64 `json:"monthly_earnings_ngn"`
 	AvailableBalanceNGN  float64 `json:"available_balance_ngn"`
@@ -273,6 +279,12 @@ type EarningsDashboard struct {
 	ActiveInvestments    int     `json:"active_investments"`
 	CompletedInvestments int     `json:"completed_investments"`
 	ExchangeRate         float64 `json:"exchange_rate"`
+	// Withdrawal gate: unlock when successful referrals >= MinReferralsRequired.
+	WithdrawalsUnlocked    bool   `json:"withdrawals_unlocked"`
+	WithdrawalLockMessage  string `json:"withdrawal_lock_message,omitempty"`
+	ActiveReferrals        int    `json:"active_referrals"`
+	MinReferralsRequired   int    `json:"min_referrals_required"`
+	RemainingReferrals     int    `json:"remaining_referrals"`
 	// LastWithdrawalAt is the timestamp of the user's most recent withdrawal request,
 	// used to enforce the one-withdrawal-every-7-days rule.
 	LastWithdrawalAt *time.Time         `json:"last_withdrawal_at,omitempty"`
@@ -290,12 +302,40 @@ type EarningsSummary struct {
 	MaxBusinessDays  int              `json:"max_business_days"`
 	RemainingDays    int              `json:"remaining_days"`
 	TotalEarnedNGN   float64          `json:"total_earned_ngn"`
-	TotalPendingNGN  float64          `json:"total_pending_ngn"`
-	Status           InvestmentStatus `json:"status"`
-	ProgressPct      float64          `json:"progress_pct"`
-	MaturityDate     *time.Time       `json:"maturity_date,omitempty"`
-	StartedAt        *time.Time       `json:"started_at,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
+	// TotalEarnedUSD is total_earned_ngn / exchange_rate for display.
+	TotalEarnedUSD  float64          `json:"total_earned_usd"`
+	TotalPendingNGN float64          `json:"total_pending_ngn"`
+	// PortfolioValueUSD = amount_usd + total_earned_usd
+	PortfolioValueUSD float64          `json:"portfolio_value_usd"`
+	Status            InvestmentStatus `json:"status"`
+	ProgressPct       float64          `json:"progress_pct"`
+	MaturityDate      *time.Time       `json:"maturity_date,omitempty"`
+	StartedAt         *time.Time       `json:"started_at,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+}
+
+// SeedPoolCreditResult summarizes one investor pool credit.
+type SeedPoolCreditResult struct {
+	UserID         string  `json:"user_id"`
+	InvestmentID   string  `json:"investment_id"`
+	AmountUSD      float64 `json:"amount_usd"`
+	ProfitUSD      float64 `json:"profit_usd"`
+	ProfitNGN      float64 `json:"profit_ngn"`
+	PortfolioUSD   float64 `json:"portfolio_usd"`
+	AlreadyCredited bool   `json:"already_credited"`
+	RewardID       string  `json:"reward_id,omitempty"`
+}
+
+// SeedPoolCreditSummary is returned by the Genesis pool seed job.
+type SeedPoolCreditSummary struct {
+	InvestorsTargeted int                    `json:"investors_targeted"`
+	InvestorsCredited int                    `json:"investors_credited"`
+	InvestorsSkipped  int                    `json:"investors_skipped"`
+	TotalProfitUSD    float64                `json:"total_profit_usd"`
+	ProfitPerInvestor float64                `json:"profit_per_investor"`
+	PoolUSD           float64                `json:"pool_usd"`
+	ExchangeRate      float64                `json:"exchange_rate"`
+	Results           []SeedPoolCreditResult `json:"results"`
 }
 
 type RewardHistoryItem struct {

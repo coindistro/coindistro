@@ -124,27 +124,56 @@ export function EarnDashboard() {
   const progress = activeInvestment
     ? activeInvestment.progress_pct ?? getProgressPercentage(daysRemaining, totalDays)
     : 0;
-  const totalEarnedFromActive = activeInvestment?.roi_cdt ?? dashboard?.today_earnings_ngn ?? 0;
-
   const todayReward = dashboard?.today_earnings_ngn ?? 0;
-  const monthReward = dashboard?.monthly_earnings_ngn ?? 0;
-  const referralEarnings = dashboard?.referral_earnings_ngn ?? 0;
+  const totalEarnedFromActive =
+    activeInvestment?.roi_cdt ?? dashboard?.total_profit_ngn ?? dashboard?.today_earnings_ngn ?? 0;
   const lastWithdrawalAt = dashboard?.last_withdrawal_at ?? null;
   const withdrawalCooldown = React.useMemo(
     () => getWithdrawalCooldown(lastWithdrawalAt),
     [lastWithdrawalAt],
   );
 
+  // Referral unlock gate (withdrawals_unlocked = successful referrals >= 5)
+  const minReferrals = dashboard?.min_referrals_required ?? dashboard?.referral_info?.minimum_target ?? 5;
+  const activeReferrals = dashboard?.active_referrals ?? dashboard?.referral_info?.active_referrals ?? 0;
+  const remainingReferrals =
+    dashboard?.remaining_referrals ?? Math.max(0, minReferrals - activeReferrals);
+  const referralsUnlocked =
+    dashboard?.withdrawals_unlocked ?? activeReferrals >= minReferrals;
+  const canWithdraw = referralsUnlocked && withdrawalCooldown.available;
+
   const loading = dashboardQ.isLoading || rateQ.isLoading || settingsQ.isLoading;
   const firstName = displayName(user).split(" ")[0] || "Investor";
 
-  // Animated counters
+  // Portfolio metrics (capital + profit)
   const totalInvestedUsd = dashboard?.total_invested_usd ?? 0;
-  const totalInvestedNgn = totalInvestedUsd * rate;
-  const animatedInvested = useCountUp(currency === "USD" ? totalInvestedUsd : totalInvestedNgn, 700, !loading);
+  const totalInvestedNgn = dashboard?.total_invested_ngn ?? totalInvestedUsd * rate;
+  const totalProfitUsd =
+    dashboard?.total_profit_usd ??
+    (rate > 0 ? (dashboard?.total_profit_ngn ?? 0) / rate : 0);
+  const totalProfitNgn = dashboard?.total_profit_ngn ?? totalProfitUsd * rate;
+  const portfolioUsd =
+    dashboard?.portfolio_value_usd ?? totalInvestedUsd + totalProfitUsd;
+  const portfolioNgn =
+    dashboard?.portfolio_value_ngn ?? totalInvestedNgn + totalProfitNgn;
+
+  // Animated counters
+  const animatedPortfolio = useCountUp(
+    currency === "USD" ? portfolioUsd : portfolioNgn,
+    700,
+    !loading,
+  );
+  const animatedInvested = useCountUp(
+    currency === "USD" ? totalInvestedUsd : totalInvestedNgn,
+    700,
+    !loading,
+  );
+  const animatedProfit = useCountUp(
+    currency === "USD" ? totalProfitUsd : totalProfitNgn,
+    700,
+    !loading,
+  );
   const animatedToday = useCountUp(todayReward, 700, !loading);
-  const animatedReferral = useCountUp(referralEarnings, 700, !loading);
-  const animatedTotalEarned = useCountUp(totalEarnedFromActive || monthReward, 700, !loading);
   const animatedAvailable = useCountUp(available, 700, !loading);
 
   const openInvest = (plan: InvestmentPlanConfig) => {
@@ -257,16 +286,40 @@ export function EarnDashboard() {
           </div>
 
           <div className="mt-6">
-            <p className="text-sm text-muted-foreground">Total Portfolio Value</p>
+            <p className="text-sm text-muted-foreground">Portfolio Value</p>
             <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-foreground sm:text-5xl">
-              {loading ? "…" : displayValue(animatedInvested)}
+              {loading ? "…" : displayValue(animatedPortfolio)}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              1 USD = {formatCurrency(rate)}
+              Investment {displayValue(animatedInvested)} · Profit{" "}
+              {loading
+                ? "…"
+                : currency === "USD"
+                  ? `$${totalProfitUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                  : formatCurrency(totalProfitNgn)}{" "}
+              · 1 USD = {formatCurrency(rate)}
             </p>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Wallet className="h-3.5 w-3.5 text-primary" />
+                Total Investment
+              </div>
+              <p className="mt-1.5 text-lg font-bold tabular-nums text-foreground">
+                {loading ? "…" : displayValue(animatedInvested)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                Total Profit
+              </div>
+              <p className="mt-1.5 text-lg font-bold tabular-nums text-emerald-500">
+                {loading ? "…" : displayValue(animatedProfit)}
+              </p>
+            </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -279,19 +332,19 @@ export function EarnDashboard() {
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Gift className="h-3.5 w-3.5 text-cyan-500" />
-                Referral Earnings
+                Referral Progress
               </div>
               <p className="mt-1.5 text-lg font-bold tabular-nums text-cyan-500">
-                {loading ? "…" : formatCurrency(animatedReferral)}
+                {loading ? "…" : `${activeReferrals} / ${minReferrals}`}
               </p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                Total Earnings
+                <Gift className="h-3.5 w-3.5 text-fuchsia-400" />
+                Remaining Referrals
               </div>
-              <p className="mt-1.5 text-lg font-bold tabular-nums text-emerald-500">
-                {loading ? "…" : formatCurrency(animatedTotalEarned)}
+              <p className="mt-1.5 text-lg font-bold tabular-nums text-fuchsia-400">
+                {loading ? "…" : remainingReferrals}
               </p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
@@ -300,7 +353,11 @@ export function EarnDashboard() {
                 Withdrawable
               </div>
               <p className="mt-1.5 text-lg font-bold tabular-nums text-primary">
-                {loading ? "…" : formatCurrency(animatedAvailable)}
+                {loading
+                  ? "…"
+                  : referralsUnlocked
+                    ? formatCurrency(animatedAvailable)
+                    : "Locked"}
               </p>
             </div>
           </div>
@@ -313,20 +370,22 @@ export function EarnDashboard() {
         onWithdraw={() => setWithdrawOpen(true)}
         onRewards={() => {}}
         onReferrals={() => {}}
-        withdrawDisabled={!withdrawalCooldown.available}
+        withdrawDisabled={!canWithdraw}
         withdrawLabel={
-          withdrawalCooldown.available
-            ? "Withdraw"
-            : `${withdrawalCooldown.daysRemaining}d left`
+          !referralsUnlocked
+            ? "Locked"
+            : withdrawalCooldown.available
+              ? "Withdraw"
+              : `${withdrawalCooldown.daysRemaining}d left`
         }
       />
 
-      {/* ─── Withdrawal Status Card (weekly countdown) ── */}
+      {/* ─── Withdrawal Lock (referrals) ──────────────── */}
       {!loading && (
         <section>
           <div
             className={`rounded-2xl border p-5 ${
-              withdrawalCooldown.available
+              referralsUnlocked
                 ? "border-emerald-500/30 bg-emerald-500/10"
                 : "border-amber-500/30 bg-amber-500/10"
             }`}
@@ -334,25 +393,47 @@ export function EarnDashboard() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Weekly Withdrawals
+                  Withdrawal Lock Status
                 </p>
-                <p className="text-xs font-medium text-muted-foreground">Next Withdrawal</p>
-                {withdrawalCooldown.available ? (
-                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                    Available Now
-                  </p>
+                {referralsUnlocked ? (
+                  <>
+                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                      Withdrawals Unlocked
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      You have {activeReferrals} successful referrals (required {minReferrals}).
+                    </p>
+                  </>
                 ) : (
                   <>
                     <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
-                      Next withdrawal available in {withdrawalCooldown.daysRemaining} day
-                      {withdrawalCooldown.daysRemaining === 1 ? "" : "s"}
+                      Withdrawals Locked
                     </p>
-                    {withdrawalCooldown.nextAvailableAt && (
-                      <p className="text-xs text-muted-foreground">
-                        Next withdrawal: {formatWithdrawalNextAvailable(withdrawalCooldown.nextAvailableAt)}
-                      </p>
-                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {dashboard?.withdrawal_lock_message ||
+                        `Complete ${minReferrals} successful referrals to unlock your earnings.`}
+                    </p>
+                    <p className="text-sm font-semibold text-foreground">
+                      Progress: {activeReferrals} / {minReferrals}
+                    </p>
+                    <div className="mt-2 h-2 max-w-xs overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all"
+                        style={{
+                          width: `${Math.min(100, (activeReferrals / Math.max(1, minReferrals)) * 100)}%`,
+                        }}
+                      />
+                    </div>
                   </>
+                )}
+                {referralsUnlocked && !withdrawalCooldown.available && (
+                  <p className="text-xs text-muted-foreground">
+                    Next weekly withdrawal in {withdrawalCooldown.daysRemaining} day
+                    {withdrawalCooldown.daysRemaining === 1 ? "" : "s"}
+                    {withdrawalCooldown.nextAvailableAt
+                      ? ` (${formatWithdrawalNextAvailable(withdrawalCooldown.nextAvailableAt)})`
+                      : ""}
+                  </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Withdrawal Processing: {processingHours} Hours
@@ -361,14 +442,14 @@ export function EarnDashboard() {
               <button
                 type="button"
                 onClick={() => setWithdrawOpen(true)}
-                disabled={!withdrawalCooldown.available}
+                disabled={!canWithdraw}
                 className={`rounded-xl px-4 py-2 text-sm font-semibold shadow-lg transition-transform ${
-                  withdrawalCooldown.available
+                  canWithdraw
                     ? "bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-primary/20 active:scale-[0.98]"
                     : "cursor-not-allowed bg-muted text-muted-foreground shadow-none"
                 }`}
               >
-                {withdrawalCooldown.available ? "Withdraw" : "Locked"}
+                {canWithdraw ? "Withdraw" : "Locked"}
               </button>
             </div>
           </div>
@@ -431,13 +512,17 @@ export function EarnDashboard() {
 
       <WithdrawalRequestModal
         open={withdrawOpen}
-        availableBalance={available}
+        availableBalance={referralsUnlocked ? available : 0}
         processingHours={processingHours}
         feePercent={feePercent}
         penaltyPercent={penaltyPercent}
         earlyWithdrawal={early}
         isSubmitting={withdrawing}
         lastWithdrawalAt={lastWithdrawalAt}
+        referralsUnlocked={referralsUnlocked}
+        activeReferrals={activeReferrals}
+        minReferrals={minReferrals}
+        lockMessage={dashboard?.withdrawal_lock_message}
         onClose={() => setWithdrawOpen(false)}
         onConfirm={submitWithdrawal}
       />

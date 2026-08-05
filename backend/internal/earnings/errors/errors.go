@@ -29,4 +29,11 @@ var (
 	ErrSystemDisabled              = apperrors.New("EARNINGS_SYSTEM_DISABLED", "Investment system is currently disabled", http.StatusServiceUnavailable)
 	ErrEmailRequired               = apperrors.New("EMAIL_REQUIRED", "Email address is required to initialize payment", http.StatusBadRequest)
 	ErrWithdrawalLocked            = apperrors.New("EARNINGS_WITHDRAWAL_LOCKED", "Withdrawals are available once every 7 days", http.StatusTooManyRequests)
+	// ErrReferralsRequired locks withdrawals until the user completes enough successful referrals.
+	ErrReferralsRequired = apperrors.New(
+		"EARNINGS_REFERRALS_REQUIRED",
+		"Withdrawals are locked. Complete 5 successful referrals to unlock your earnings.",
+		http.StatusForbidden,
+	)
+	ErrPoolAlreadyCredited = apperrors.New("EARNINGS_POOL_ALREADY_CREDITED", "Genesis pool profit already credited for this investment", http.StatusConflict)
 )

@@ -31,6 +31,11 @@ interface WithdrawalRequestModalProps {
   earlyWithdrawal: boolean;
   isSubmitting: boolean;
   lastWithdrawalAt?: string | null;
+  /** False until successful referrals >= minReferrals. */
+  referralsUnlocked?: boolean;
+  activeReferrals?: number;
+  minReferrals?: number;
+  lockMessage?: string | null;
   onClose: () => void;
   onConfirm: (amount: number) => Promise<void> | void;
 }
@@ -44,6 +49,10 @@ export function WithdrawalRequestModal({
   earlyWithdrawal,
   isSubmitting,
   lastWithdrawalAt,
+  referralsUnlocked = true,
+  activeReferrals = 0,
+  minReferrals = 5,
+  lockMessage,
   onClose,
   onConfirm,
 }: WithdrawalRequestModalProps) {
@@ -61,7 +70,9 @@ export function WithdrawalRequestModal({
     () => getWithdrawalCooldown(lastWithdrawalAt),
     [lastWithdrawalAt],
   );
-  const locked = !cooldown.available;
+  const weeklyLocked = !cooldown.available;
+  const referralLocked = !referralsUnlocked;
+  const locked = weeklyLocked || referralLocked;
 
   const requested = Number(amount);
   const withdrawal = calculateWithdrawal(requested, feePercent, penaltyPercent, earlyWithdrawal);
@@ -85,7 +96,24 @@ export function WithdrawalRequestModal({
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
-          {/* Withdrawal status card */}
+          {/* Referral unlock gate */}
+          {referralLocked && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-1">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-amber-600" />
+                <p className="font-semibold text-foreground">Withdrawals Locked</p>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {lockMessage ||
+                  `Complete ${minReferrals} successful referrals to unlock your earnings.`}
+              </p>
+              <p className="text-sm font-semibold text-foreground">
+                Progress: {activeReferrals} / {minReferrals}
+              </p>
+            </div>
+          )}
+
+          {/* Weekly withdrawal status card */}
           <div
             className={`rounded-lg border p-4 space-y-1 ${
               locked
@@ -97,7 +125,11 @@ export function WithdrawalRequestModal({
               <Lock className="h-4 w-4 text-muted-foreground" />
               <p className="font-semibold text-foreground">Next Withdrawal Available</p>
             </div>
-            {locked ? (
+            {referralLocked ? (
+              <p className="mt-2 text-lg font-bold text-amber-600 dark:text-amber-400">
+                Locked — referrals required
+              </p>
+            ) : weeklyLocked ? (
               <>
                 <p className="mt-2 text-lg font-bold text-amber-600 dark:text-amber-400">
                   {cooldown.daysRemaining} Day{cooldown.daysRemaining === 1 ? "" : "s"} Remaining

@@ -65,6 +65,10 @@ export interface EarningsSummary {
 export interface EarningsDashboard {
   total_invested_usd: number;
   total_invested_ngn: number;
+  portfolio_value_usd?: number;
+  portfolio_value_ngn?: number;
+  total_profit_usd?: number;
+  total_profit_ngn?: number;
   today_earnings_ngn: number;
   monthly_earnings_ngn: number;
   available_balance_ngn: number;
@@ -73,6 +77,12 @@ export interface EarningsDashboard {
   active_investments: number;
   completed_investments: number;
   exchange_rate: number;
+  /** Withdrawals unlock when successful referrals >= min_referrals_required. */
+  withdrawals_unlocked?: boolean;
+  withdrawal_lock_message?: string;
+  active_referrals?: number;
+  min_referrals_required?: number;
+  remaining_referrals?: number;
   /** Timestamp of the user's most recent withdrawal request (weekly withdrawal lock). */
   last_withdrawal_at?: string | null;
   investments: EarningsSummary[];

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -293,6 +294,173 @@ func (s *Store) ListActiveInvestments(ctx context.Context, limit int) ([]*models
 		list = append(list, &inv)
 	}
 	return list, rows.Err()
+}
+
+// ListActiveInvestmentsByAmountUSD returns active investments at a given capital (e.g. $30 Genesis).
+func (s *Store) ListActiveInvestmentsByAmountUSD(ctx context.Context, amountUSD float64, limit int) ([]*models.EarningsInvestment, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.pool.Query(ctx,
+		earningsInvestmentSelect+` WHERE i.status = 'active' AND i.amount_usd = $1 ORDER BY i.created_at ASC LIMIT $2`,
+		amountUSD, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*models.EarningsInvestment
+	for rows.Next() {
+		var inv models.EarningsInvestment
+		if err := rows.Scan(earningsInvestmentScanArgs(&inv)...); err != nil {
+			return nil, err
+		}
+		list = append(list, &inv)
+	}
+	return list, rows.Err()
+}
+
+// HasRewardWithStatus reports whether an investment already has a reward of the given status
+// (used for idempotent pool-seed credits).
+func (s *Store) HasRewardWithStatus(ctx context.Context, investmentID, status string) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM investment_rewards WHERE investment_id = $1 AND status = $2`,
+		investmentID, status,
+	).Scan(&n)
+	return n > 0, err
+}
+
+// CountSuccessfulReferrals counts active referred users for the referral unlock gate.
+// A successful referral is an active identity user who registered with this referrer.
+func (s *Store) CountSuccessfulReferrals(ctx context.Context, referrerID string) (int, error) {
+	var n int
+	// Prefer the referrals table when populated; also count identity_users.referred_by.
+	err := s.pool.QueryRow(ctx, `
+		SELECT GREATEST(
+			(SELECT COUNT(*) FROM identity_users
+			 WHERE referred_by = $1 AND deleted_at IS NULL AND status = 'active'),
+			(SELECT COUNT(*) FROM referrals
+			 WHERE referrer_id = $1 AND status IN ('active', 'converted'))
+		)`, referrerID).Scan(&n)
+	if err != nil {
+		// Fallback if referrals table shape differs
+		err2 := s.pool.QueryRow(ctx, `
+			SELECT COUNT(*) FROM identity_users
+			WHERE referred_by = $1 AND deleted_at IS NULL AND status = 'active'`, referrerID,
+		).Scan(&n)
+		return n, err2
+	}
+	return n, nil
+}
+
+// GetOrCreateCurrencyWallet returns the user's wallet for a currency, creating it if needed.
+func (s *Store) GetOrCreateCurrencyWallet(ctx context.Context, userID, currency string) (walletID string, available, total float64, err error) {
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if currency == "" {
+		currency = "NGN"
+	}
+	err = s.pool.QueryRow(ctx, `
+		SELECT id, available_balance, total_balance FROM wallets
+		WHERE user_id = $1 AND currency = $2 LIMIT 1`, userID, currency,
+	).Scan(&walletID, &available, &total)
+	if err == nil {
+		return walletID, available, total, nil
+	}
+	if err != pgx.ErrNoRows {
+		// currency column may not exist on older schemas — try without currency
+		err2 := s.pool.QueryRow(ctx, `
+			SELECT id, available_balance, total_balance FROM wallets WHERE user_id = $1 LIMIT 1`, userID,
+		).Scan(&walletID, &available, &total)
+		if err2 == nil {
+			return walletID, available, total, nil
+		}
+		if err2 != pgx.ErrNoRows {
+			return "", 0, 0, err
+		}
+	}
+
+	// Create wallet
+	err = s.pool.QueryRow(ctx, `
+		INSERT INTO wallets (id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at)
+		VALUES (uuid_generate_v4(), $1, $2, 0, 0, 0, 0, NOW())
+		RETURNING id, available_balance, total_balance`, userID, currency,
+	).Scan(&walletID, &available, &total)
+	if err != nil {
+		// Retry without currency column for legacy single-wallet schema
+		err = s.pool.QueryRow(ctx, `
+			INSERT INTO wallets (id, user_id, available_balance, locked_balance, staking_balance, total_balance, updated_at)
+			VALUES (uuid_generate_v4(), $1, 0, 0, 0, 0, NOW())
+			ON CONFLICT DO NOTHING
+			RETURNING id, available_balance, total_balance`, userID,
+		).Scan(&walletID, &available, &total)
+		if err != nil {
+			// Final get
+			err = s.pool.QueryRow(ctx, `
+				SELECT id, available_balance, total_balance FROM wallets WHERE user_id = $1 LIMIT 1`, userID,
+			).Scan(&walletID, &available, &total)
+		}
+	}
+	return walletID, available, total, err
+}
+
+// CreditWalletAvailable credits available + total balance and records a wallet_transactions row.
+func (s *Store) CreditWalletAvailable(ctx context.Context, walletID string, amount float64, txType, reference, description string) error {
+	var before float64
+	err := s.pool.QueryRow(ctx, `SELECT available_balance FROM wallets WHERE id = $1`, walletID).Scan(&before)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `
+		UPDATE wallets SET
+			available_balance = available_balance + $2,
+			total_balance = total_balance + $2,
+			updated_at = NOW()
+		WHERE id = $1`, walletID, amount)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO wallet_transactions (id, wallet_id, type, amount, balance_before, balance_after, reference, description, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
+		walletID, txType, amount, before, before+amount, reference, description,
+	)
+	// wallet_transactions may not exist in all envs — ignore missing table
+	if err != nil && strings.Contains(err.Error(), "wallet_transactions") {
+		return nil
+	}
+	return err
+}
+
+// CreateRewardReturning inserts a reward and returns its generated id.
+func (s *Store) CreateRewardReturning(ctx context.Context, r *models.InvestmentReward) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO investment_rewards (id, investment_id, user_id, amount_ngn, reward_date, business_day_number, status, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, NOW())
+		RETURNING id`,
+		r.InvestmentID, r.UserID, r.AmountNGN, r.RewardDate, r.BusinessDayNumber, r.Status,
+	).Scan(&id)
+	return id, err
+}
+
+// InsertActivityEvent writes a lightweight activity/audit trail row when activity_log exists.
+func (s *Store) InsertActivityEvent(ctx context.Context, userID, action string, details map[string]interface{}) error {
+	payload, _ := json.Marshal(details)
+	if len(payload) == 0 {
+		payload = []byte("{}")
+	}
+	// Best-effort: activity_log schema varies; ignore if unavailable.
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO activity_log (id, user_id, action, details, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3::jsonb, NOW())`,
+		userID, action, string(payload),
+	)
+	if err != nil {
+		return nil // non-fatal
+	}
+	return nil
 }
 
 func (s *Store) CountInvestmentsByStatus(ctx context.Context, status string) (int, error) {

@@ -73,6 +73,8 @@ const (
 	ActionEarnExit              Action = "earn_exit"
 	ActionEarnLaunchpoolCreated Action = "earn_launchpool_created"
 	ActionEarnLearnComplete     Action = "earn_learn_complete"
+	// Investment earnings (Genesis / daily rewards / pool credits)
+	ActionEarningsCredited Action = "earnings_credited"
 )
 
 // EntityType represents the type of entity being acted upon.
