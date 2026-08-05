@@ -1496,6 +1496,7 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 
 	var summaries []*models.EarningsSummary
 	totalProfitNGN := 0.0
+	var lockedUSD, lockedNGN float64
 
 	for _, inv := range investments {
 		dash.TotalInvestedUSD += inv.AmountUSD
@@ -1505,8 +1506,13 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 		switch inv.Status {
 		case models.InvestmentStatusActive:
 			dash.ActiveInvestments++
+			// Capital remains locked while the plan is active.
+			lockedUSD += inv.AmountUSD
+			lockedNGN += inv.AmountNGN
 		case models.InvestmentStatusCompleted:
 			dash.CompletedInvestments++
+		case models.InvestmentStatusPendingPayment:
+			// Pending payments are not yet locked capital.
 		}
 
 		rateInv := inv.ExchangeRate
@@ -1516,6 +1522,10 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 		earnedUSD := 0.0
 		if rateInv > 0 {
 			earnedUSD = inv.TotalEarnedNGN / rateInv
+		}
+		roiPct := 0.0
+		if inv.AmountUSD > 0 {
+			roiPct = (earnedUSD / inv.AmountUSD) * 100
 		}
 
 		summary := &models.EarningsSummary{
@@ -1530,6 +1540,8 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 			TotalEarnedUSD:    earnedUSD,
 			TotalPendingNGN:   inv.TotalPendingNGN,
 			PortfolioValueUSD: inv.AmountUSD + earnedUSD,
+			PortfolioValueNGN: inv.AmountNGN + inv.TotalEarnedNGN,
+			ROIPercentage:     math.Round(roiPct*100) / 100,
 			Status:            inv.Status,
 			MaturityDate:      inv.MaturityDate,
 			StartedAt:         inv.StartedAt,
@@ -1567,6 +1579,23 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 	}
 	dash.PortfolioValueUSD = dash.TotalInvestedUSD + dash.TotalProfitUSD
 	dash.PortfolioValueNGN = dash.TotalInvestedNGN + dash.TotalProfitNGN
+
+	// Explicit portfolio aliases for clients (Bybit-style position view).
+	dash.CapitalInvestedUSD = dash.TotalInvestedUSD
+	dash.CapitalInvestedNGN = dash.TotalInvestedNGN
+	dash.ProfitEarnedUSD = dash.TotalProfitUSD
+	dash.ProfitEarnedNGN = dash.TotalProfitNGN
+	dash.LockedBalanceUSD = lockedUSD
+	dash.LockedBalanceNGN = lockedNGN
+	// Earnings are withdrawable only after referral unlock; capital stays locked.
+	if unlocked {
+		dash.WithdrawableBalanceNGN = dash.AvailableBalanceNGN
+	} else {
+		dash.WithdrawableBalanceNGN = 0
+	}
+	if dash.TotalInvestedUSD > 0 {
+		dash.ROIPercentage = math.Round((dash.TotalProfitUSD/dash.TotalInvestedUSD)*10000) / 100
+	}
 
 	// Get referral info
 	referralInfo := &models.ReferralInfo{

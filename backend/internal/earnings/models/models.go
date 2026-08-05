@@ -265,12 +265,25 @@ type AdminWithdrawalActionRequest struct {
 type EarningsDashboard struct {
 	TotalInvestedUSD     float64 `json:"total_invested_usd"`
 	TotalInvestedNGN     float64 `json:"total_invested_ngn"`
-	// PortfolioValue = capital invested + total profit (earnings).
+	// PortfolioValue = capital invested + total profit (earnings). Display only — not free cash.
 	PortfolioValueUSD float64 `json:"portfolio_value_usd"`
 	PortfolioValueNGN float64 `json:"portfolio_value_ngn"`
-	// TotalProfit is lifetime investment rewards credited to the investor.
-	TotalProfitUSD       float64 `json:"total_profit_usd"`
-	TotalProfitNGN       float64 `json:"total_profit_ngn"`
+	// TotalProfit / ProfitEarned is lifetime investment rewards credited to the investor.
+	TotalProfitUSD  float64 `json:"total_profit_usd"`
+	TotalProfitNGN  float64 `json:"total_profit_ngn"`
+	ProfitEarnedUSD float64 `json:"profit_earned_usd"`
+	ProfitEarnedNGN float64 `json:"profit_earned_ngn"`
+	// CapitalInvested aliases TotalInvested for portfolio clients.
+	CapitalInvestedUSD float64 `json:"capital_invested_usd"`
+	CapitalInvestedNGN float64 `json:"capital_invested_ngn"`
+	// LockedBalance is investment capital still locked in active plans.
+	LockedBalanceUSD float64 `json:"locked_balance_usd"`
+	LockedBalanceNGN float64 `json:"locked_balance_ngn"`
+	// WithdrawableBalance is earnings that can be withdrawn when referrals unlock.
+	// Zero while WithdrawalsUnlocked is false (capital stays locked separately).
+	WithdrawableBalanceNGN float64 `json:"withdrawable_balance_ngn"`
+	// ROIPercentage = (profit / capital) * 100 across the portfolio.
+	ROIPercentage        float64 `json:"roi_percentage"`
 	TodayEarningsNGN     float64 `json:"today_earnings_ngn"`
 	MonthlyEarningsNGN   float64 `json:"monthly_earnings_ngn"`
 	AvailableBalanceNGN  float64 `json:"available_balance_ngn"`
@@ -280,11 +293,11 @@ type EarningsDashboard struct {
 	CompletedInvestments int     `json:"completed_investments"`
 	ExchangeRate         float64 `json:"exchange_rate"`
 	// Withdrawal gate: unlock when successful referrals >= MinReferralsRequired.
-	WithdrawalsUnlocked    bool   `json:"withdrawals_unlocked"`
-	WithdrawalLockMessage  string `json:"withdrawal_lock_message,omitempty"`
-	ActiveReferrals        int    `json:"active_referrals"`
-	MinReferralsRequired   int    `json:"min_referrals_required"`
-	RemainingReferrals     int    `json:"remaining_referrals"`
+	WithdrawalsUnlocked   bool   `json:"withdrawals_unlocked"`
+	WithdrawalLockMessage string `json:"withdrawal_lock_message,omitempty"`
+	ActiveReferrals       int    `json:"active_referrals"`
+	MinReferralsRequired  int    `json:"min_referrals_required"`
+	RemainingReferrals    int    `json:"remaining_referrals"`
 	// LastWithdrawalAt is the timestamp of the user's most recent withdrawal request,
 	// used to enforce the one-withdrawal-every-7-days rule.
 	LastWithdrawalAt *time.Time         `json:"last_withdrawal_at,omitempty"`
@@ -293,25 +306,28 @@ type EarningsDashboard struct {
 }
 
 type EarningsSummary struct {
-	ID               string           `json:"id"`
-	AmountUSD        float64          `json:"amount_usd"`
-	AmountNGN        float64          `json:"amount_ngn"`
-	ExchangeRate     float64          `json:"exchange_rate"`
-	DailyRewardNGN   float64          `json:"daily_reward_ngn"`
-	PaidBusinessDays int              `json:"paid_business_days"`
-	MaxBusinessDays  int              `json:"max_business_days"`
-	RemainingDays    int              `json:"remaining_days"`
-	TotalEarnedNGN   float64          `json:"total_earned_ngn"`
+	ID               string  `json:"id"`
+	AmountUSD        float64 `json:"amount_usd"`
+	AmountNGN        float64 `json:"amount_ngn"`
+	ExchangeRate     float64 `json:"exchange_rate"`
+	DailyRewardNGN   float64 `json:"daily_reward_ngn"`
+	PaidBusinessDays int     `json:"paid_business_days"`
+	MaxBusinessDays  int     `json:"max_business_days"`
+	RemainingDays    int     `json:"remaining_days"`
+	TotalEarnedNGN   float64 `json:"total_earned_ngn"`
 	// TotalEarnedUSD is total_earned_ngn / exchange_rate for display.
-	TotalEarnedUSD  float64          `json:"total_earned_usd"`
-	TotalPendingNGN float64          `json:"total_pending_ngn"`
-	// PortfolioValueUSD = amount_usd + total_earned_usd
-	PortfolioValueUSD float64          `json:"portfolio_value_usd"`
-	Status            InvestmentStatus `json:"status"`
-	ProgressPct       float64          `json:"progress_pct"`
-	MaturityDate      *time.Time       `json:"maturity_date,omitempty"`
-	StartedAt         *time.Time       `json:"started_at,omitempty"`
-	CreatedAt         time.Time        `json:"created_at"`
+	TotalEarnedUSD  float64 `json:"total_earned_usd"`
+	TotalPendingNGN float64 `json:"total_pending_ngn"`
+	// PortfolioValue = capital + earned profit (position value, not free cash).
+	PortfolioValueUSD float64 `json:"portfolio_value_usd"`
+	PortfolioValueNGN float64 `json:"portfolio_value_ngn"`
+	// ROIPercentage = (earned / capital) * 100 for this position.
+	ROIPercentage float64          `json:"roi_percentage"`
+	Status        InvestmentStatus `json:"status"`
+	ProgressPct   float64          `json:"progress_pct"`
+	MaturityDate  *time.Time       `json:"maturity_date,omitempty"`
+	StartedAt     *time.Time       `json:"started_at,omitempty"`
+	CreatedAt     time.Time        `json:"created_at"`
 }
 
 // SeedPoolCreditResult summarizes one investor pool credit.

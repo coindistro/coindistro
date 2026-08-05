@@ -5,6 +5,17 @@ import { CalendarDays, TrendingUp, Wallet } from "lucide-react";
 import { formatCurrency } from "@/features/earn/utils";
 import type { InvestmentSummary } from "@/lib/api/types";
 
+export interface ActivePositionMetrics {
+  capitalUsd: number;
+  capitalNgn: number;
+  profitUsd: number;
+  profitNgn: number;
+  currentValueUsd: number;
+  currentValueNgn: number;
+  roiPercent: number;
+  exchangeRate: number;
+}
+
 interface ActiveInvestmentCardProps {
   investment: InvestmentSummary | null;
   totalDays: number;
@@ -15,6 +26,11 @@ interface ActiveInvestmentCardProps {
   totalEarned: number;
   expectedRoi: number;
   processingHours?: number;
+  position?: ActivePositionMetrics | null;
+}
+
+function formatUsd(value: number) {
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 export function ActiveInvestmentCard({
@@ -27,6 +43,7 @@ export function ActiveInvestmentCard({
   totalEarned,
   expectedRoi,
   processingHours = 24,
+  position,
 }: ActiveInvestmentCardProps) {
   if (!investment) {
     return (
@@ -36,28 +53,34 @@ export function ActiveInvestmentCard({
         </div>
         <h3 className="mt-4 text-lg font-semibold text-foreground">No active investment</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose the Genesis Plan ($10 / ₦14,000 · 18% ROI) to start earning daily rewards.
+          Choose a Genesis plan to start earning daily rewards.
         </p>
       </div>
     );
   }
 
-  const statusLabel =
-    investment.status === "active"
-      ? "Active"
-      : investment.status === "completed"
-        ? "Completed"
-        : "Pending";
+  const isActive = investment.status === "active";
+  const statusLabel = isActive
+    ? "Growing"
+    : investment.status === "completed"
+      ? "Completed"
+      : "Pending";
 
-  const statusColor =
-    investment.status === "active"
-      ? "bg-emerald-500/10 text-emerald-500"
-      : investment.status === "completed"
-        ? "bg-cyan-500/10 text-cyan-500"
-        : "bg-amber-500/10 text-amber-500";
+  const statusColor = isActive
+    ? "bg-emerald-500/10 text-emerald-500"
+    : investment.status === "completed"
+      ? "bg-cyan-500/10 text-cyan-500"
+      : "bg-amber-500/10 text-amber-500";
 
-  const expectedPayout =
-    (Number(investment.amount_paid) || 0) * (1 + Math.max(0, expectedRoi) / 100);
+  const capitalUsd = position?.capitalUsd ?? 0;
+  const capitalNgn = position?.capitalNgn ?? (Number(investment.amount_paid) || 0);
+  const profitUsd = position?.profitUsd ?? 0;
+  const profitNgn = position?.profitNgn ?? totalEarned;
+  const currentUsd = position?.currentValueUsd ?? capitalUsd + profitUsd;
+  const currentNgn = position?.currentValueNgn ?? capitalNgn + profitNgn;
+  const roi =
+    position?.roiPercent ??
+    (capitalUsd > 0 ? (profitUsd / capitalUsd) * 100 : expectedRoi);
 
   return (
     <motion.div
@@ -83,40 +106,51 @@ export function ActiveInvestmentCard({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
             <p className="text-xs text-muted-foreground">Investment</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-foreground">
-              {formatCurrency(investment.amount_paid)}
+              {capitalUsd > 0 ? formatUsd(capitalUsd) : formatCurrency(capitalNgn)}
             </p>
+            {capitalUsd > 0 && (
+              <p className="text-[11px] text-muted-foreground">{formatCurrency(capitalNgn)}</p>
+            )}
           </div>
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Daily Reward</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-amber-500">
-              {formatCurrency(dailyReward)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Remaining Days</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{daysRemaining}</p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Expected ROI</p>
+            <p className="text-xs text-muted-foreground">Current Value</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-primary">
-              {expectedRoi.toFixed(1)}%
+              {formatUsd(currentUsd)}
             </p>
+            <p className="text-[11px] text-muted-foreground">{formatCurrency(currentNgn)}</p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Expected Payout</p>
+            <p className="text-xs text-muted-foreground">Profit</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-emerald-500">
-              {formatCurrency(expectedPayout)}
+              +{formatUsd(profitUsd)}
             </p>
+            <p className="text-[11px] text-muted-foreground">+{formatCurrency(profitNgn)}</p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Total Earned</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-emerald-500">
-              {formatCurrency(totalEarned)}
+            <p className="text-xs text-muted-foreground">ROI</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-amber-500">
+              {roi.toFixed(2)}%
             </p>
+            <p className="text-[11px] text-muted-foreground">On capital</p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-border/40 bg-muted/20 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">Daily Reward</p>
+            <p className="text-sm font-semibold tabular-nums">{formatCurrency(dailyReward)}</p>
+          </div>
+          <div className="rounded-xl border border-border/40 bg-muted/20 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">Plan ROI setting</p>
+            <p className="text-sm font-semibold tabular-nums">{expectedRoi.toFixed(1)}%</p>
+          </div>
+          <div className="rounded-xl border border-border/40 bg-muted/20 px-3 py-2 sm:col-span-1 col-span-2">
+            <p className="text-[11px] text-muted-foreground">Status</p>
+            <p className="text-sm font-semibold">{statusLabel}</p>
           </div>
         </div>
 
@@ -144,7 +178,8 @@ export function ActiveInvestmentCard({
             </span>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Withdrawal Processing: Up to {processingHours} Hours
+            Capital remains locked in the plan. Withdrawal Processing: Up to {processingHours} Hours
+            after unlock.
           </p>
         </div>
       </div>

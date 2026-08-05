@@ -54,7 +54,11 @@ export interface EarningsSummary {
   max_business_days: number;
   remaining_days: number;
   total_earned_ngn: number;
+  total_earned_usd?: number;
   total_pending_ngn: number;
+  portfolio_value_usd?: number;
+  portfolio_value_ngn?: number;
+  roi_percentage?: number;
   status: InvestmentStatus;
   progress_pct: number;
   maturity_date?: string | null;
@@ -69,6 +73,14 @@ export interface EarningsDashboard {
   portfolio_value_ngn?: number;
   total_profit_usd?: number;
   total_profit_ngn?: number;
+  profit_earned_usd?: number;
+  profit_earned_ngn?: number;
+  capital_invested_usd?: number;
+  capital_invested_ngn?: number;
+  locked_balance_usd?: number;
+  locked_balance_ngn?: number;
+  withdrawable_balance_ngn?: number;
+  roi_percentage?: number;
   today_earnings_ngn: number;
   monthly_earnings_ngn: number;
   available_balance_ngn: number;

@@ -2,12 +2,17 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { RefreshCw, TrendingUp, Gift, Sparkles, Wallet } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/features/authentication/auth-provider";
 import { useWallet, useInvestments } from "@/features/earn/hooks";
 import { useCountUp } from "@/features/earn/components/use-count-up";
 import { QuickActions } from "@/features/earn/components/quick-actions";
 import { ActiveInvestmentCard } from "@/features/earn/components/active-investment-card";
+import { PortfolioAssetsCard } from "@/features/earn/components/portfolio-assets-card";
+import {
+  PortfolioHistory,
+  buildPortfolioHistory,
+} from "@/features/earn/components/portfolio-history";
 import { RewardTimeline } from "@/features/earn/components/reward-timeline";
 import { PremiumInvestmentCard } from "@/features/earn/components/premium-investment-card";
 import { InvestmentModal } from "@/features/earn/components/investment-modal";
@@ -52,13 +57,19 @@ function normalizeInvestment(
   const amountNgn = item.amount_ngn;
   const earnedNgn = item.total_earned_ngn;
   const amountUsd = item.amount_usd;
+  const earnedUsd =
+    item.total_earned_usd ??
+    (item.exchange_rate > 0 ? earnedNgn / item.exchange_rate : 0);
+  const roiPct =
+    item.roi_percentage ??
+    (amountUsd > 0 ? (earnedUsd / amountUsd) * 100 : matchPlanRoi(amountUsd, settingsRoi));
   return {
     id: item.id,
     plan_name: `${matchPlanName(amountUsd)} Plan`,
     amount_paid: amountNgn,
     allocated_cdt: amountNgn,
     roi_cdt: earnedNgn,
-    roi_percent: matchPlanRoi(amountUsd, settingsRoi),
+    roi_percent: roiPct,
     daily_reward_ngn: item.daily_reward_ngn,
     status: item.status,
     lock_period_days: item.max_business_days,
@@ -70,10 +81,15 @@ function normalizeInvestment(
   };
 }
 
-function formatCompact(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toFixed(0);
+function formatUsd(value: number) {
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function formatDual(usd: number, ngn: number) {
+  return {
+    primaryUsd: formatUsd(usd),
+    secondaryNgn: formatCurrency(ngn),
+  };
 }
 
 export function EarnDashboard() {
@@ -88,7 +104,6 @@ export function EarnDashboard() {
   const [selectedPlan, setSelectedPlan] = React.useState<InvestmentPlanConfig | null>(null);
   const [withdrawOpen, setWithdrawOpen] = React.useState(false);
   const [withdrawing, setWithdrawing] = React.useState(false);
-  const [currency, setCurrency] = React.useState<"USD" | "NGN">("USD");
   const [refreshing, setRefreshing] = React.useState(false);
 
   const dashboard = dashboardQ.data;
@@ -124,7 +139,6 @@ export function EarnDashboard() {
   const progress = activeInvestment
     ? activeInvestment.progress_pct ?? getProgressPercentage(daysRemaining, totalDays)
     : 0;
-  const todayReward = dashboard?.today_earnings_ngn ?? 0;
   const totalEarnedFromActive =
     activeInvestment?.roi_cdt ?? dashboard?.total_profit_ngn ?? dashboard?.today_earnings_ngn ?? 0;
   const lastWithdrawalAt = dashboard?.last_withdrawal_at ?? null;
@@ -145,36 +159,76 @@ export function EarnDashboard() {
   const loading = dashboardQ.isLoading || rateQ.isLoading || settingsQ.isLoading;
   const firstName = displayName(user).split(" ")[0] || "Investor";
 
-  // Portfolio metrics (capital + profit)
-  const totalInvestedUsd = dashboard?.total_invested_usd ?? 0;
-  const totalInvestedNgn = dashboard?.total_invested_ngn ?? totalInvestedUsd * rate;
+  // Portfolio metrics (capital + profit) — position view, not free cash
+  const totalInvestedUsd =
+    dashboard?.capital_invested_usd ?? dashboard?.total_invested_usd ?? 0;
+  const totalInvestedNgn =
+    dashboard?.capital_invested_ngn ??
+    dashboard?.total_invested_ngn ??
+    totalInvestedUsd * rate;
   const totalProfitUsd =
+    dashboard?.profit_earned_usd ??
     dashboard?.total_profit_usd ??
     (rate > 0 ? (dashboard?.total_profit_ngn ?? 0) / rate : 0);
-  const totalProfitNgn = dashboard?.total_profit_ngn ?? totalProfitUsd * rate;
+  const totalProfitNgn =
+    dashboard?.profit_earned_ngn ?? dashboard?.total_profit_ngn ?? totalProfitUsd * rate;
   const portfolioUsd =
     dashboard?.portfolio_value_usd ?? totalInvestedUsd + totalProfitUsd;
   const portfolioNgn =
     dashboard?.portfolio_value_ngn ?? totalInvestedNgn + totalProfitNgn;
+  const lockedNgn = dashboard?.locked_balance_ngn ?? totalInvestedNgn;
+  const withdrawableNgn = referralsUnlocked
+    ? dashboard?.withdrawable_balance_ngn ?? available
+    : 0;
+  // Available free cash: earnings shown as withdrawable path when unlocked; capital is separate.
+  const freeAvailableNgn = Math.max(0, available - totalProfitNgn);
+  const roiPercentage =
+    dashboard?.roi_percentage ??
+    (totalInvestedUsd > 0 ? (totalProfitUsd / totalInvestedUsd) * 100 : 0);
+
+  // Active position metrics for the investment card
+  const activeEarnings = dashboard?.investments?.find((i) => i.status === "active");
+  const positionCapitalUsd = activeEarnings?.amount_usd ?? totalInvestedUsd;
+  const positionCapitalNgn = activeEarnings?.amount_ngn ?? totalInvestedNgn;
+  const positionProfitUsd =
+    activeEarnings?.total_earned_usd ??
+    (activeEarnings && activeEarnings.exchange_rate > 0
+      ? activeEarnings.total_earned_ngn / activeEarnings.exchange_rate
+      : totalProfitUsd);
+  const positionProfitNgn = activeEarnings?.total_earned_ngn ?? totalProfitNgn;
+  const positionValueUsd =
+    activeEarnings?.portfolio_value_usd ?? positionCapitalUsd + positionProfitUsd;
+  const positionValueNgn =
+    activeEarnings?.portfolio_value_ngn ?? positionCapitalNgn + positionProfitNgn;
+  const positionRoi =
+    activeEarnings?.roi_percentage ??
+    (positionCapitalUsd > 0 ? (positionProfitUsd / positionCapitalUsd) * 100 : roiPercentage);
 
   // Animated counters
-  const animatedPortfolio = useCountUp(
-    currency === "USD" ? portfolioUsd : portfolioNgn,
-    700,
-    !loading,
+  const animatedPortfolio = useCountUp(portfolioUsd, 700, !loading);
+  const animatedInvested = useCountUp(totalInvestedUsd, 700, !loading);
+  const animatedProfit = useCountUp(totalProfitUsd, 700, !loading);
+
+  const historyEvents = React.useMemo(
+    () =>
+      buildPortfolioHistory({
+        capitalUsd: positionCapitalUsd,
+        profitUsd: positionProfitUsd,
+        portfolioUsd: positionValueUsd,
+        capitalNgn: positionCapitalNgn,
+        profitNgn: positionProfitNgn,
+        startedAt: activeInvestment?.started_at,
+        hasProfit: positionProfitUsd > 0 || positionProfitNgn > 0,
+      }),
+    [
+      positionCapitalUsd,
+      positionProfitUsd,
+      positionValueUsd,
+      positionCapitalNgn,
+      positionProfitNgn,
+      activeInvestment?.started_at,
+    ],
   );
-  const animatedInvested = useCountUp(
-    currency === "USD" ? totalInvestedUsd : totalInvestedNgn,
-    700,
-    !loading,
-  );
-  const animatedProfit = useCountUp(
-    currency === "USD" ? totalProfitUsd : totalProfitNgn,
-    700,
-    !loading,
-  );
-  const animatedToday = useCountUp(todayReward, 700, !loading);
-  const animatedAvailable = useCountUp(available, 700, !loading);
 
   const openInvest = (plan: InvestmentPlanConfig) => {
     setSelectedPlan(plan);
@@ -234,16 +288,13 @@ export function EarnDashboard() {
     }
   };
 
-  const displayValue = (value: number) => {
-    if (currency === "USD") {
-      return `$${formatCompact(value)}`;
-    }
-    return formatCurrency(value);
-  };
+  const capitalDisplay = formatDual(totalInvestedUsd, totalInvestedNgn);
+  const profitDisplay = formatDual(totalProfitUsd, totalProfitNgn);
+  const portfolioDisplay = formatDual(portfolioUsd, portfolioNgn);
 
   return (
     <div className="relative mx-auto max-w-6xl space-y-6 pb-10">
-      {/* ─── Hero Section ─────────────────────────────── */}
+      {/* ─── Hero Portfolio Card ───────────────────────── */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -259,105 +310,58 @@ export function EarnDashboard() {
               <p className="text-sm text-muted-foreground">Welcome back,</p>
               <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{firstName}</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex rounded-xl border border-border bg-background/60 p-1">
-                {(["USD", "NGN"] as const).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCurrency(c)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      currency === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                aria-label="Refresh rates"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background/60 text-muted-foreground transition-colors hover:text-primary"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              aria-label="Refresh portfolio"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background/60 text-muted-foreground transition-colors hover:text-primary"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
           </div>
 
           <div className="mt-6">
-            <p className="text-sm text-muted-foreground">Portfolio Value</p>
+            <p className="text-sm font-medium text-muted-foreground">Portfolio Value</p>
             <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-foreground sm:text-5xl">
-              {loading ? "…" : displayValue(animatedPortfolio)}
+              {loading ? "…" : formatUsd(animatedPortfolio)}
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Investment {displayValue(animatedInvested)} · Profit{" "}
-              {loading
-                ? "…"
-                : currency === "USD"
-                  ? `$${totalProfitUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                  : formatCurrency(totalProfitNgn)}{" "}
-              · 1 USD = {formatCurrency(rate)}
+            <p className="mt-2 text-base text-muted-foreground">
+              ≈ {loading ? "…" : formatCurrency(portfolioNgn)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              1 USD = {formatCurrency(rate || 1400)} · Position value (capital + profit)
             </p>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Wallet className="h-3.5 w-3.5 text-primary" />
-                Total Investment
-              </div>
+              <p className="text-xs text-muted-foreground">Invested Capital</p>
               <p className="mt-1.5 text-lg font-bold tabular-nums text-foreground">
-                {loading ? "…" : displayValue(animatedInvested)}
+                {loading ? "…" : formatUsd(animatedInvested)}
               </p>
+              <p className="text-xs text-muted-foreground">{capitalDisplay.secondaryNgn}</p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                Total Profit
-              </div>
+              <p className="text-xs text-muted-foreground">Profit Earned</p>
               <p className="mt-1.5 text-lg font-bold tabular-nums text-emerald-500">
-                {loading ? "…" : displayValue(animatedProfit)}
+                {loading ? "…" : `+${formatUsd(animatedProfit)}`}
               </p>
+              <p className="text-xs text-muted-foreground">+{profitDisplay.secondaryNgn}</p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                Today&apos;s Earnings
-              </div>
+              <p className="text-xs text-muted-foreground">ROI</p>
               <p className="mt-1.5 text-lg font-bold tabular-nums text-amber-500">
-                {loading ? "…" : formatCurrency(animatedToday)}
+                {loading ? "…" : `${roiPercentage.toFixed(2)}%`}
               </p>
+              <p className="text-xs text-muted-foreground">On invested capital</p>
             </div>
             <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Gift className="h-3.5 w-3.5 text-cyan-500" />
-                Referral Progress
-              </div>
-              <p className="mt-1.5 text-lg font-bold tabular-nums text-cyan-500">
-                {loading ? "…" : `${activeReferrals} / ${minReferrals}`}
+              <p className="text-xs text-muted-foreground">Status</p>
+              <p className="mt-1.5 text-lg font-bold text-emerald-500">
+                {activeInvestment ? "Active" : "—"}
               </p>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Gift className="h-3.5 w-3.5 text-fuchsia-400" />
-                Remaining Referrals
-              </div>
-              <p className="mt-1.5 text-lg font-bold tabular-nums text-fuchsia-400">
-                {loading ? "…" : remainingReferrals}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Wallet className="h-3.5 w-3.5 text-primary" />
-                Withdrawable
-              </div>
-              <p className="mt-1.5 text-lg font-bold tabular-nums text-primary">
-                {loading
-                  ? "…"
-                  : referralsUnlocked
-                    ? formatCurrency(animatedAvailable)
-                    : "Locked"}
+              <p className="text-xs text-muted-foreground">
+                {activeInvestment ? "Growing" : "No active plan"}
               </p>
             </div>
           </div>
@@ -456,6 +460,47 @@ export function EarnDashboard() {
         </section>
       )}
 
+      {/* ─── Assets breakdown ─────────────────────────── */}
+      <PortfolioAssetsCard
+        availableNgn={freeAvailableNgn}
+        lockedInvestmentNgn={lockedNgn}
+        profitEarnedNgn={totalProfitNgn}
+        withdrawableNgn={withdrawableNgn}
+        withdrawalsUnlocked={referralsUnlocked}
+        lockMessage={dashboard?.withdrawal_lock_message}
+        minReferrals={minReferrals}
+        activeReferrals={activeReferrals}
+      />
+
+      {/* ─── Earnings Summary ─────────────────────────── */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Earnings Summary</h2>
+          <p className="text-sm text-muted-foreground">Capital, rewards, and lock status</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <SummaryTile label="Capital Invested" value={portfolioDisplay.primaryUsd} sub={capitalDisplay.secondaryNgn} />
+          <SummaryTile label="Total Profit" value={`+${profitDisplay.primaryUsd}`} sub={`+${profitDisplay.secondaryNgn}`} accent="text-emerald-500" />
+          <SummaryTile label="Total Portfolio" value={portfolioDisplay.primaryUsd} sub={portfolioDisplay.secondaryNgn} accent="text-primary" />
+          <SummaryTile label="Total Rewards" value={formatCurrency(totalProfitNgn)} sub={`${formatUsd(totalProfitUsd)} USD`} />
+          <SummaryTile
+            label="Pending Withdrawals"
+            value={formatCurrency(dashboard?.pending_withdrawal_ngn ?? 0)}
+            sub="In review / processing"
+          />
+          <SummaryTile
+            label="Withdrawal Lock"
+            value={referralsUnlocked ? "Unlocked" : "Locked"}
+            sub={
+              referralsUnlocked
+                ? `${activeReferrals}/${minReferrals} referrals`
+                : `${remainingReferrals} remaining · ${activeReferrals}/${minReferrals}`
+            }
+            accent={referralsUnlocked ? "text-emerald-500" : "text-amber-500"}
+          />
+        </div>
+      </section>
+
       {/* ─── Active Investment ────────────────────────── */}
       <section>
         <h2 className="mb-3 text-lg font-bold text-foreground">Active Investment</h2>
@@ -467,10 +512,23 @@ export function EarnDashboard() {
           progress={progress}
           dailyReward={dailyReward}
           totalEarned={totalEarnedFromActive}
-          expectedRoi={activeInvestment?.roi_percent ?? settingsRoi}
+          expectedRoi={settingsRoi}
           processingHours={processingHours}
+          position={{
+            capitalUsd: positionCapitalUsd,
+            capitalNgn: positionCapitalNgn,
+            profitUsd: positionProfitUsd,
+            profitNgn: positionProfitNgn,
+            currentValueUsd: positionValueUsd,
+            currentValueNgn: positionValueNgn,
+            roiPercent: positionRoi,
+            exchangeRate: rate || 1400,
+          }}
         />
       </section>
+
+      {/* ─── Portfolio History ────────────────────────── */}
+      <PortfolioHistory events={historyEvents} />
 
       {/* ─── Investment Plans ─────────────────────────── */}
       <section>
@@ -526,6 +584,28 @@ export function EarnDashboard() {
         onClose={() => setWithdrawOpen(false)}
         onConfirm={submitWithdrawal}
       />
+    </div>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-[1.25rem] border border-border/60 bg-card/80 p-4 shadow-sm">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-1.5 text-base font-bold tabular-nums ${accent ?? "text-foreground"}`}>
+        {value}
+      </p>
+      {sub ? <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p> : null}
     </div>
   );
 }
