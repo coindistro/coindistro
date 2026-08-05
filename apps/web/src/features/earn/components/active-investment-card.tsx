@@ -14,6 +14,7 @@ interface ActiveInvestmentCardProps {
   dailyReward: number;
   totalEarned: number;
   expectedRoi: number;
+  processingHours?: number;
 }
 
 export function ActiveInvestmentCard({
@@ -25,6 +26,7 @@ export function ActiveInvestmentCard({
   dailyReward,
   totalEarned,
   expectedRoi,
+  processingHours = 24,
 }: ActiveInvestmentCardProps) {
   if (!investment) {
     return (
@@ -34,7 +36,7 @@ export function ActiveInvestmentCard({
         </div>
         <h3 className="mt-4 text-lg font-semibold text-foreground">No active investment</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose a Genesis plan to start earning daily rewards.
+          Choose the Genesis Plan ($10 / ₦14,000 · 18% ROI) to start earning daily rewards.
         </p>
       </div>
     );
@@ -54,6 +56,9 @@ export function ActiveInvestmentCard({
         ? "bg-cyan-500/10 text-cyan-500"
         : "bg-amber-500/10 text-amber-500";
 
+  const expectedPayout =
+    (Number(investment.amount_paid) || 0) * (1 + Math.max(0, expectedRoi) / 100);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -66,7 +71,9 @@ export function ActiveInvestmentCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-bold text-foreground">{investment.plan_name}</h3>
+            <h3 className="text-lg font-bold text-foreground">
+              {investment.plan_name || "Genesis Plan"}
+            </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(investment.started_at)} — {formatDate(investment.matures_at)}
             </p>
@@ -76,7 +83,7 @@ export function ActiveInvestmentCard({
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
             <p className="text-xs text-muted-foreground">Investment</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-foreground">
@@ -84,21 +91,31 @@ export function ActiveInvestmentCard({
             </p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Today&apos;s Reward</p>
+            <p className="text-xs text-muted-foreground">Daily Reward</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-amber-500">
               {formatCurrency(dailyReward)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+            <p className="text-xs text-muted-foreground">Remaining Days</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{daysRemaining}</p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+            <p className="text-xs text-muted-foreground">Expected ROI</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-primary">
+              {expectedRoi.toFixed(1)}%
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+            <p className="text-xs text-muted-foreground">Expected Payout</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-emerald-500">
+              {formatCurrency(expectedPayout)}
             </p>
           </div>
           <div className="rounded-xl border border-border/60 bg-background/50 p-3">
             <p className="text-xs text-muted-foreground">Total Earned</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-emerald-500">
               {formatCurrency(totalEarned)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground">Expected ROI</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-primary">
-              {expectedRoi.toFixed(1)}%
             </p>
           </div>
         </div>
@@ -126,6 +143,9 @@ export function ActiveInvestmentCard({
               <TrendingUp className="h-3 w-3" /> {Math.round(progress)}% complete
             </span>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Withdrawal Processing: Up to {processingHours} Hours
+          </p>
         </div>
       </div>
     </motion.div>

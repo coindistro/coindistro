@@ -15,6 +15,7 @@ interface PremiumInvestmentCardProps {
 export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumInvestmentCardProps) {
   const [expanded, setExpanded] = React.useState(false);
   const ngnValue = plan.usdAmount * exchangeRate;
+  const roiPercent = plan.roiPercent;
 
   return (
     <motion.div
@@ -34,9 +35,12 @@ export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumI
             <h3 className="text-lg font-bold text-foreground">{plan.name}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
           </div>
-          <span className="rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold tabular-nums text-primary">
-            ${plan.usdAmount.toLocaleString()}
-          </span>
+          <div className="text-right">
+            <span className="rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold tabular-nums text-primary">
+              ${plan.usdAmount.toLocaleString()}
+            </span>
+            <p className="mt-1 text-xs font-semibold text-fuchsia-500">{formatCurrency(ngnValue)}</p>
+          </div>
         </div>
 
         {/* Key stats */}
@@ -44,9 +48,9 @@ export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumI
           <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-amber-500" />
-              Daily
+              ROI
             </div>
-            <p className="mt-1 text-sm font-semibold text-foreground">{formatCurrency(plan.dailyRewardNgn)}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{roiPercent}%</p>
           </div>
           <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -65,8 +69,8 @@ export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumI
         </div>
 
         <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-background/50 px-4 py-3">
-          <span className="text-xs text-muted-foreground">NGN Equivalent</span>
-          <span className="text-sm font-semibold text-fuchsia-500">{formatCurrency(ngnValue)}</span>
+          <span className="text-xs text-muted-foreground">Daily Earnings</span>
+          <span className="text-sm font-semibold text-amber-600">{formatCurrency(plan.dailyRewardNgn)}</span>
         </div>
 
         {/* Expandable details */}
@@ -81,6 +85,10 @@ export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumI
             >
               <div className="mt-4 space-y-2 rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Return</span>
+                  <span className="font-semibold text-emerald-500">{formatCurrency(plan.totalReturnNgn)}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Reward</span>
                   <span className="font-semibold text-emerald-500">{formatCurrency(plan.monthlyRewardNgn)}</span>
                 </div>
@@ -94,9 +102,7 @@ export function PremiumInvestmentCard({ plan, exchangeRate, onSelect }: PremiumI
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Estimated ROI</span>
-                  <span className="font-semibold text-primary">
-                    {((plan.monthlyRewardNgn / ngnValue) * 100).toFixed(1)}%
-                  </span>
+                  <span className="font-semibold text-primary">{roiPercent}%</span>
                 </div>
               </div>
             </motion.div>

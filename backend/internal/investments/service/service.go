@@ -622,8 +622,8 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		return err
 	}
 
-	// Get or create wallet
-	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID)
+	// Get or create CDT wallet (investments are denominated in CDT)
+	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID, "CDT")
 	if err != nil {
 		return err
 	}
@@ -702,7 +702,7 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Inve
 	}
 	s.logger.Info("investments loaded", zap.String("user_id", userID), zap.Int("count", len(investments)))
 
-	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
+	wallet, err := s.store.GetOrCreateWallet(ctx, userID, "CDT")
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +778,7 @@ func (s *Service) GetWallet(ctx context.Context, userID string) (*models.Wallet,
 	if !s.hasStore() {
 		return &models.Wallet{UserID: userID, AvailableBalance: 0, LockedBalance: 0, TotalBalance: 0}, nil
 	}
-	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
+	wallet, err := s.store.GetOrCreateWallet(ctx, userID, "CDT")
 	if err != nil {
 		return nil, err
 	}
@@ -795,7 +795,7 @@ func (s *Service) GetWalletTransactions(ctx context.Context, userID string, page
 	if !s.hasStore() {
 		return []*models.WalletTransaction{}, 0, nil
 	}
-	wallet, err := s.store.GetOrCreateWallet(ctx, userID)
+	wallet, err := s.store.GetOrCreateWallet(ctx, userID, "CDT")
 	if err != nil {
 		return nil, 0, err
 	}
@@ -851,8 +851,8 @@ func (s *Service) processMaturedInvestment(ctx context.Context, inv *models.Inve
 		return err
 	}
 
-	// Get wallet
-	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID)
+	// Get CDT wallet
+	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID, "CDT")
 	if err != nil {
 		return err
 	}

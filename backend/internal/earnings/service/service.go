@@ -78,15 +78,16 @@ func New(
 
 func defaultInvestmentSettings() *models.InvestmentSettings {
 	return &models.InvestmentSettings{
-		MinimumInvestmentUSD:          30,
-		DailyRewardNGN:                650,
+		MinimumInvestmentUSD:          10,
+		DailyRewardNGN:                126,
 		MaxBusinessDays:               20,
-		ROIPercent:                    30,
+		ROIPercent:                    18,
 		ReferralPercent:               10,
 		MinReferralsForPayout:         5,
 		EarlyWithdrawalPenaltyPercent: 15,
 		EarlyWithdrawalFeePercent:     5,
 		WithdrawalProcessingHours:     24,
+		WithdrawalIntervalDays:        7,
 		Enabled:                       true,
 	}
 }
@@ -144,6 +145,9 @@ func (s *Service) UpdateSettings(ctx context.Context, req *models.AdminUpdateSet
 	}
 	if req.WithdrawalProcessingHours != nil {
 		settings.WithdrawalProcessingHours = *req.WithdrawalProcessingHours
+	}
+	if req.WithdrawalIntervalDays != nil {
+		settings.WithdrawalIntervalDays = *req.WithdrawalIntervalDays
 	}
 	if req.Enabled != nil {
 		settings.Enabled = *req.Enabled
@@ -262,8 +266,18 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		return nil, err
 	}
 
+	// Load the authenticated user's email from the identity store.
+	// Never trust a client-supplied email — the backend is the source of truth.
+	email, err := s.store.GetUserEmail(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if email == "" {
+		return nil, errors.ErrEmailRequired
+	}
+
 	// Call Paystack initialize API
-	authURL, accessCode, err := s.callPaystackInitialize(ctx, amountNGN, req.Currency, reference, userID)
+	authURL, accessCode, err := s.callPaystackInitialize(ctx, amountNGN, req.Currency, reference, userID, email)
 	if err != nil {
 		return nil, err
 	}
@@ -334,6 +348,16 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 	}
 	if err := s.store.CreatePaymentTransaction(ctx, pt); err != nil {
 		return nil, err
+	}
+
+	// Load the authenticated user's email from the identity store.
+	// Never trust a client-supplied email — the backend is the source of truth.
+	email, err := s.store.GetUserEmail(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if email == "" {
+		return nil, errors.ErrEmailRequired
 	}
 
 	// Call Flutterwave initialize API
@@ -725,6 +749,9 @@ func (s *Service) processDailyReward(ctx context.Context, inv *models.EarningsIn
 
 // ─── Withdrawal Processing ───────────────────────────────
 
+// defaultWithdrawalInterval is the fallback lock between withdrawal requests (7 days).
+const defaultWithdrawalInterval = 7 * 24 * time.Hour
+
 func (s *Service) RequestWithdrawal(ctx context.Context, userID string, req *models.WithdrawalRequest) (*models.Withdrawal, error) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
@@ -732,6 +759,22 @@ func (s *Service) RequestWithdrawal(ctx context.Context, userID string, req *mod
 	}
 	if settings == nil {
 		return nil, errors.ErrSettingsNotFound
+	}
+
+	// Enforce the one-withdrawal-every-N-days rule (default 7).
+	interval := defaultWithdrawalInterval
+	if settings.WithdrawalIntervalDays > 0 {
+		interval = time.Duration(settings.WithdrawalIntervalDays) * 24 * time.Hour
+	}
+	last, err := s.store.GetLastWithdrawal(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if last != nil {
+		elapsed := time.Since(last.CreatedAt)
+		if elapsed < interval {
+			return nil, errors.ErrWithdrawalLocked
+		}
 	}
 
 	var withdrawal *models.Withdrawal
@@ -1085,6 +1128,12 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 	pendingWithdrawals, _ := s.store.SumPendingWithdrawalsByUser(ctx, userID)
 	referralEarnings, _ := s.store.SumReferralCommissionsByReferrer(ctx, userID, "paid")
 
+	// Load the last withdrawal to power the weekly withdrawal countdown.
+	var lastWithdrawalAt *time.Time
+	if last, err := s.store.GetLastWithdrawal(ctx, userID); err == nil && last != nil {
+		lastWithdrawalAt = &last.CreatedAt
+	}
+
 	dash := &models.EarningsDashboard{
 		TotalInvestedUSD:     0,
 		TotalInvestedNGN:     0,
@@ -1094,6 +1143,7 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 		AvailableBalanceNGN:  totalEarnings - pendingWithdrawals,
 		PendingWithdrawalNGN: pendingWithdrawals,
 		ReferralEarningsNGN:  referralEarnings,
+		LastWithdrawalAt:     lastWithdrawalAt,
 	}
 
 	var summaries []*models.EarningsSummary
@@ -1347,7 +1397,7 @@ func (s *Service) createNotification(ctx context.Context, userID, notifType, tit
 
 // ─── Payment Gateway API Calls ───────────────────────────
 
-func (s *Service) callPaystackInitialize(ctx context.Context, amount float64, currency, reference, userID string) (string, string, error) {
+func (s *Service) callPaystackInitialize(ctx context.Context, amount float64, currency, reference, userID, email string) (string, string, error) {
 	if s.cfg.PaystackSecretKey == "" {
 		return "", "", errors.ErrGatewayNotConfigured
 	}
@@ -1356,6 +1406,7 @@ func (s *Service) callPaystackInitialize(ctx context.Context, amount float64, cu
 	payload := map[string]interface{}{
 		"amount":       amountInKobo,
 		"currency":     currency,
+		"email":        email,
 		"reference":    reference,
 		"callback_url": fmt.Sprintf("%s/investments/verify", s.cfg.BaseURL),
 	}

@@ -8,6 +8,7 @@ export interface InvestmentSettings {
   early_withdrawal_penalty_percent: number;
   early_withdrawal_fee_percent: number;
   withdrawal_processing_hours: number;
+  withdrawal_interval_days: number;
   enabled: boolean;
 }
 
@@ -72,6 +73,8 @@ export interface EarningsDashboard {
   active_investments: number;
   completed_investments: number;
   exchange_rate: number;
+  /** Timestamp of the user's most recent withdrawal request (weekly withdrawal lock). */
+  last_withdrawal_at?: string | null;
   investments: EarningsSummary[];
   referral_info?: ReferralInfo;
 }

@@ -23,4 +23,5 @@ var (
 	ErrGatewayNotConfigured      = apperrors.New("GATEWAY_NOT_CONFIGURED", "Payment gateway is not configured", http.StatusServiceUnavailable)
 	ErrDuplicateWebhook          = apperrors.New("DUPLICATE_WEBHOOK", "Duplicate webhook event", http.StatusConflict)
 	ErrInvestmentNotMature       = apperrors.New("INVESTMENT_NOT_MATURE", "Investment has not reached maturity", http.StatusBadRequest)
+	ErrEmailRequired             = apperrors.New("EMAIL_REQUIRED", "Email address is required to initialize payment", http.StatusBadRequest)
 )

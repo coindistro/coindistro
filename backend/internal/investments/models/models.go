@@ -78,10 +78,13 @@ type PaymentTransaction struct {
 
 // ─── Wallets ───────────────────────────────────────────
 
-// Wallet represents a user's internal CDT wallet.
+// Wallet represents a user's wallet for a single currency.
+// CoinDistro is multi-currency: one user owns many wallets, one per currency
+// (NGN, USD, USDT, BTC, ETH, CDT, ...). Currency is always set and unique per user.
 type Wallet struct {
 	ID               string    `json:"id" db:"id"`
 	UserID           string    `json:"user_id" db:"user_id"`
+	Currency         string    `json:"currency" db:"currency"`
 	AvailableBalance float64   `json:"available_balance" db:"available_balance"`
 	LockedBalance    float64   `json:"locked_balance" db:"locked_balance"`
 	StakingBalance   float64   `json:"staking_balance" db:"staking_balance"`

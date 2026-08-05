@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,22 @@ type Store struct {
 // New creates an investment store.
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
+}
+
+// GetUserEmail returns the authenticated user's email from the identity store.
+// The backend never trusts a client-supplied email — this is the source of truth.
+func (s *Store) GetUserEmail(ctx context.Context, userID string) (string, error) {
+	var email string
+	err := s.pool.QueryRow(ctx,
+		`SELECT email FROM identity_users WHERE id = $1 AND deleted_at IS NULL`, userID,
+	).Scan(&email)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(email), nil
 }
 
 // ─── Investment Plans ─────────────────────────────────
@@ -399,9 +416,18 @@ func (s *Store) ListPaymentTransactions(ctx context.Context, status string, page
 
 // ─── Wallets ──────────────────────────────────────────
 
-func (s *Store) GetOrCreateWallet(ctx context.Context, userID string) (*models.Wallet, error) {
-	// Try to get existing wallet
-	w, err := s.scanWallet(s.pool.QueryRow(ctx, walletSelect+" WHERE user_id = $1", userID))
+// GetOrCreateWallet returns the user's wallet for the given currency, creating
+// it if it does not exist. CoinDistro is multi-currency: a user owns many
+// wallets, one per currency (NGN, USD, USDT, BTC, ETH, CDT, ...). Currency is
+// always set and unique per (user, currency).
+func (s *Store) GetOrCreateWallet(ctx context.Context, userID, currency string) (*models.Wallet, error) {
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if currency == "" {
+		currency = "CDT"
+	}
+
+	// Try to get existing wallet for this currency
+	w, err := s.scanWallet(s.pool.QueryRow(ctx, walletSelect+" WHERE user_id = $1 AND currency = $2", userID, currency))
 	if err != nil {
 		return nil, err
 	}
@@ -409,15 +435,15 @@ func (s *Store) GetOrCreateWallet(ctx context.Context, userID string) (*models.W
 		return w, nil
 	}
 
-	// Create new wallet
+	// Create new wallet for this currency
 	_, err = s.pool.Exec(ctx, `
-		INSERT INTO wallets (id, user_id, available_balance, locked_balance, staking_balance, total_balance, updated_at)
-		VALUES (uuid_generate_v4(), $1, 0, 0, 0, 0, NOW())`, userID)
+		INSERT INTO wallets (id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at)
+		VALUES (uuid_generate_v4(), $1, $2, 0, 0, 0, 0, NOW())`, userID, currency)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.scanWallet(s.pool.QueryRow(ctx, walletSelect+" WHERE user_id = $1", userID))
+	return s.scanWallet(s.pool.QueryRow(ctx, walletSelect+" WHERE user_id = $1 AND currency = $2", userID, currency))
 }
 
 func (s *Store) GetWalletByUserID(ctx context.Context, userID string) (*models.Wallet, error) {
@@ -502,12 +528,12 @@ func (s *Store) ListWallets(ctx context.Context, page, perPage int) ([]*models.W
 }
 
 const walletSelect = `
-	SELECT id, user_id, available_balance, locked_balance, staking_balance, total_balance, updated_at
+	SELECT id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at
 	FROM wallets`
 
 func (s *Store) scanWallet(row pgx.Row) (*models.Wallet, error) {
 	var w models.Wallet
-	err := row.Scan(&w.ID, &w.UserID, &w.AvailableBalance, &w.LockedBalance, &w.StakingBalance, &w.TotalBalance, &w.UpdatedAt)
+	err := row.Scan(&w.ID, &w.UserID, &w.Currency, &w.AvailableBalance, &w.LockedBalance, &w.StakingBalance, &w.TotalBalance, &w.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}

@@ -62,6 +62,54 @@ export function formatCurrency(value: number | null | undefined, currency = "₦
   return `${currency}${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format(value)}`;
 }
 
+// ─── Weekly Withdrawal Lock ─────────────────────────────────
+
+export const WITHDRAWAL_INTERVAL_DAYS = 7;
+export const WITHDRAWAL_PROCESSING_HOURS = 24;
+
+export interface WithdrawalCooldown {
+  /** True when the user is allowed to submit a new withdrawal. */
+  available: boolean;
+  /** Whole days remaining until the next withdrawal is available. */
+  daysRemaining: number;
+  /** ISO timestamp of when the next withdrawal becomes available. */
+  nextAvailableAt: string | null;
+}
+
+/** Compute the weekly withdrawal cooldown based on the last withdrawal time. */
+export function getWithdrawalCooldown(lastWithdrawalAt?: string | null): WithdrawalCooldown {
+  if (!lastWithdrawalAt) {
+    return { available: true, daysRemaining: 0, nextAvailableAt: null };
+  }
+  const last = new Date(lastWithdrawalAt).getTime();
+  if (Number.isNaN(last)) {
+    return { available: true, daysRemaining: 0, nextAvailableAt: null };
+  }
+  const nextAvailable = last + WITHDRAWAL_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const remainingMs = nextAvailable - now;
+  if (remainingMs <= 0) {
+    return { available: true, daysRemaining: 0, nextAvailableAt: new Date(nextAvailable).toISOString() };
+  }
+  return {
+    available: false,
+    daysRemaining: Math.ceil(remainingMs / (24 * 60 * 60 * 1000)),
+    nextAvailableAt: new Date(nextAvailable).toISOString(),
+  };
+}
+
+/** Format the next available date e.g. "Tuesday, 14 August". */
+export function formatWithdrawalNextAvailable(isoString?: string | null): string {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
 export function formatRoi(value: number | null | undefined) {
   if (value == null || Number.isNaN(value)) return "—";
   return `${new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 }).format(value)}%`;

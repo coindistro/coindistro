@@ -18,6 +18,7 @@ type InvestmentSettings struct {
 	EarlyWithdrawalPenaltyPercent float64   `json:"early_withdrawal_penalty_percent" db:"early_withdrawal_penalty_percent"`
 	EarlyWithdrawalFeePercent     float64   `json:"early_withdrawal_fee_percent" db:"early_withdrawal_fee_percent"`
 	WithdrawalProcessingHours     int       `json:"withdrawal_processing_hours" db:"withdrawal_processing_hours"`
+	WithdrawalIntervalDays        int       `json:"withdrawal_interval_days" db:"withdrawal_interval_days"`
 	Enabled                       bool      `json:"enabled" db:"enabled"`
 	UpdatedBy                     *string   `json:"updated_by,omitempty" db:"updated_by"`
 	CreatedAt                     time.Time `json:"created_at" db:"created_at"`
@@ -240,6 +241,7 @@ type AdminUpdateSettingsRequest struct {
 	EarlyWithdrawalPenaltyPercent *float64 `json:"early_withdrawal_penalty_percent"`
 	EarlyWithdrawalFeePercent     *float64 `json:"early_withdrawal_fee_percent"`
 	WithdrawalProcessingHours     *int     `json:"withdrawal_processing_hours"`
+	WithdrawalIntervalDays        *int     `json:"withdrawal_interval_days"`
 	Enabled                       *bool    `json:"enabled"`
 }
 
@@ -261,18 +263,21 @@ type AdminWithdrawalActionRequest struct {
 // ─── Response DTOs ────────────────────────────────────────
 
 type EarningsDashboard struct {
-	TotalInvestedUSD     float64            `json:"total_invested_usd"`
-	TotalInvestedNGN     float64            `json:"total_invested_ngn"`
-	TodayEarningsNGN     float64            `json:"today_earnings_ngn"`
-	MonthlyEarningsNGN   float64            `json:"monthly_earnings_ngn"`
-	AvailableBalanceNGN  float64            `json:"available_balance_ngn"`
-	PendingWithdrawalNGN float64            `json:"pending_withdrawal_ngn"`
-	ReferralEarningsNGN  float64            `json:"referral_earnings_ngn"`
-	ActiveInvestments    int                `json:"active_investments"`
-	CompletedInvestments int                `json:"completed_investments"`
-	ExchangeRate         float64            `json:"exchange_rate"`
-	Investments          []*EarningsSummary `json:"investments"`
-	ReferralInfo         *ReferralInfo      `json:"referral_info,omitempty"`
+	TotalInvestedUSD     float64 `json:"total_invested_usd"`
+	TotalInvestedNGN     float64 `json:"total_invested_ngn"`
+	TodayEarningsNGN     float64 `json:"today_earnings_ngn"`
+	MonthlyEarningsNGN   float64 `json:"monthly_earnings_ngn"`
+	AvailableBalanceNGN  float64 `json:"available_balance_ngn"`
+	PendingWithdrawalNGN float64 `json:"pending_withdrawal_ngn"`
+	ReferralEarningsNGN  float64 `json:"referral_earnings_ngn"`
+	ActiveInvestments    int     `json:"active_investments"`
+	CompletedInvestments int     `json:"completed_investments"`
+	ExchangeRate         float64 `json:"exchange_rate"`
+	// LastWithdrawalAt is the timestamp of the user's most recent withdrawal request,
+	// used to enforce the one-withdrawal-every-7-days rule.
+	LastWithdrawalAt *time.Time         `json:"last_withdrawal_at,omitempty"`
+	Investments      []*EarningsSummary `json:"investments"`
+	ReferralInfo     *ReferralInfo      `json:"referral_info,omitempty"`
 }
 
 type EarningsSummary struct {

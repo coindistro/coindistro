@@ -13,7 +13,26 @@ import {
 } from "./utils";
 
 describe("earn helpers", () => {
-  it("calculates the CoinDistro $30 / ₦1,600 / ₦650 investment model", () => {
+  it("calculates the Genesis $10 / ₦1,400 / 18% investment model", () => {
+    const calc = calculateInvestment({
+      amountUsd: 10,
+      exchangeRate: 1400,
+      dailyRewardNgn: 126,
+      durationBusinessDays: 20,
+      roiPercent: 18,
+    });
+    expect(calc).toMatchObject({
+      amountNgn: 14000,
+      dailyEarningsNgn: 126,
+      monthlyEarningsNgn: 2520,
+      totalEarningsNgn: 2520,
+      totalPayoutNgn: 16520,
+      businessDaysRemaining: 20,
+      roiPercent: 18,
+    });
+  });
+
+  it("calculates proportional rewards when ROI is derived", () => {
     const calc = calculateInvestment({
       amountUsd: 30,
       exchangeRate: 1600,
@@ -35,13 +54,13 @@ describe("earn helpers", () => {
   it("respects an explicit ROI percent when provided", () => {
     expect(
       calculateInvestment({
-        amountUsd: 30,
-        exchangeRate: 1600,
-        dailyRewardNgn: 650,
+        amountUsd: 10,
+        exchangeRate: 1400,
+        dailyRewardNgn: 126,
         durationBusinessDays: 20,
-        roiPercent: 30,
+        roiPercent: 18,
       }).roiPercent,
-    ).toBe(30);
+    ).toBe(18);
   });
 
   it("calculates withdrawal deductions", () => {

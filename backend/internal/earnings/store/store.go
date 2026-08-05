@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,6 +22,22 @@ func New(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// GetUserEmail returns the authenticated user's email from the identity store.
+// The backend never trusts a client-supplied email — this is the source of truth.
+func (s *Store) GetUserEmail(ctx context.Context, userID string) (string, error) {
+	var email string
+	err := s.pool.QueryRow(ctx,
+		`SELECT email FROM identity_users WHERE id = $1 AND deleted_at IS NULL`, userID,
+	).Scan(&email)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(email), nil
+}
+
 // ─── Settings ────────────────────────────────────────────
 
 func (s *Store) GetSettings(ctx context.Context) (*models.InvestmentSettings, error) {
@@ -29,12 +46,14 @@ func (s *Store) GetSettings(ctx context.Context) (*models.InvestmentSettings, er
 		SELECT id, minimum_investment_usd, daily_reward_ngn, max_business_days,
 			roi_percent, referral_percent, min_referrals_for_payout,
 			early_withdrawal_penalty_percent, early_withdrawal_fee_percent,
-			withdrawal_processing_hours, enabled, updated_by, created_at, updated_at
+			withdrawal_processing_hours, withdrawal_interval_days, enabled,
+			updated_by, created_at, updated_at
 		FROM investment_settings LIMIT 1`).Scan(
 		&m.ID, &m.MinimumInvestmentUSD, &m.DailyRewardNGN, &m.MaxBusinessDays,
 		&m.ROIPercent, &m.ReferralPercent, &m.MinReferralsForPayout,
 		&m.EarlyWithdrawalPenaltyPercent, &m.EarlyWithdrawalFeePercent,
-		&m.WithdrawalProcessingHours, &m.Enabled, &m.UpdatedBy, &m.CreatedAt, &m.UpdatedAt,
+		&m.WithdrawalProcessingHours, &m.WithdrawalIntervalDays, &m.Enabled,
+		&m.UpdatedBy, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -51,13 +70,13 @@ func (s *Store) UpdateSettings(ctx context.Context, m *models.InvestmentSettings
 			minimum_investment_usd = $2, daily_reward_ngn = $3, max_business_days = $4,
 			roi_percent = $5, referral_percent = $6, min_referrals_for_payout = $7,
 			early_withdrawal_penalty_percent = $8, early_withdrawal_fee_percent = $9,
-			withdrawal_processing_hours = $10, enabled = $11, updated_by = $12,
-			updated_at = NOW()
+			withdrawal_processing_hours = $10, withdrawal_interval_days = $11,
+			enabled = $12, updated_by = $13, updated_at = NOW()
 		WHERE id = $1`,
 		m.ID, m.MinimumInvestmentUSD, m.DailyRewardNGN, m.MaxBusinessDays,
 		m.ROIPercent, m.ReferralPercent, m.MinReferralsForPayout,
 		m.EarlyWithdrawalPenaltyPercent, m.EarlyWithdrawalFeePercent,
-		m.WithdrawalProcessingHours, m.Enabled, m.UpdatedBy,
+		m.WithdrawalProcessingHours, m.WithdrawalIntervalDays, m.Enabled, m.UpdatedBy,
 	)
 	return err
 }
@@ -565,6 +584,28 @@ func (s *Store) SumPendingWithdrawalsByUser(ctx context.Context, userID string) 
 	var sum float64
 	err := s.pool.QueryRow(ctx, `SELECT COALESCE(SUM(amount_ngn), 0) FROM withdrawals WHERE user_id = $1 AND status IN ('pending_review', 'approved', 'processing')`, userID).Scan(&sum)
 	return sum, err
+}
+
+// GetLastWithdrawal returns the most recent withdrawal request for a user,
+// used to enforce the one-withdrawal-every-7-days rule.
+func (s *Store) GetLastWithdrawal(ctx context.Context, userID string) (*models.Withdrawal, error) {
+	var w models.Withdrawal
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, user_id, investment_id, amount_ngn, fee_ngn, penalty_ngn,
+			net_amount_ngn, withdrawal_type, status, reviewed_by, reviewed_at,
+			processed_at, completed_at, rejection_reason, created_at, updated_at
+		FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, userID).Scan(
+		&w.ID, &w.UserID, &w.InvestmentID, &w.AmountNGN, &w.FeeNGN, &w.PenaltyNGN,
+		&w.NetAmountNGN, &w.WithdrawalType, &w.Status, &w.ReviewedBy, &w.ReviewedAt,
+		&w.ProcessedAt, &w.CompletedAt, &w.RejectionReason, &w.CreatedAt, &w.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
 }
 
 // ─── Payment Transactions ────────────────────────────────
