@@ -41,10 +41,14 @@ func (s *Service) hasStore() bool {
 }
 
 // Config holds the earnings service configuration.
+// Paystack keys must be supplied from PAYSTACK_* environment variables so
+// merchant accounts can be swapped without code changes.
 type Config struct {
 	BaseURL               string
 	PaystackSecretKey     string
 	PaystackPublicKey     string
+	PaystackCallbackURL   string
+	PaystackWebhookSecret string
 	FlutterwaveSecretKey  string
 	FlutterwavePublicKey  string
 	FlutterwaveSecretHash string
@@ -1397,6 +1401,18 @@ func (s *Service) createNotification(ctx context.Context, userID, notifType, tit
 
 // ─── Payment Gateway API Calls ───────────────────────────
 
+func (s *Service) paystackCallbackURL() string {
+	if strings.TrimSpace(s.cfg.PaystackCallbackURL) != "" {
+		return strings.TrimSpace(s.cfg.PaystackCallbackURL)
+	}
+	// Fallback for local/dev when PAYSTACK_CALLBACK_URL is unset.
+	base := strings.TrimRight(s.cfg.AppURL, "/")
+	if base == "" {
+		base = strings.TrimRight(s.cfg.BaseURL, "/")
+	}
+	return base + "/app/earn"
+}
+
 func (s *Service) callPaystackInitialize(ctx context.Context, amount float64, currency, reference, userID, email string) (string, string, error) {
 	if s.cfg.PaystackSecretKey == "" {
 		return "", "", errors.ErrGatewayNotConfigured
@@ -1408,7 +1424,12 @@ func (s *Service) callPaystackInitialize(ctx context.Context, amount float64, cu
 		"currency":     currency,
 		"email":        email,
 		"reference":    reference,
-		"callback_url": fmt.Sprintf("%s/investments/verify", s.cfg.BaseURL),
+		"callback_url": s.paystackCallbackURL(),
+		"metadata": map[string]interface{}{
+			"user_id":     userID,
+			"platform":    "coindistro",
+			"payment_for": "earnings_investment",
+		},
 	}
 
 	body, _ := json.Marshal(payload)
@@ -1471,7 +1492,12 @@ func (s *Service) verifyPaystackTransaction(ctx context.Context, reference strin
 }
 
 func (s *Service) verifyPaystackSignature(payload []byte, signature string) bool {
-	if s.cfg.PaystackSecretKey == "" {
+	// Prefer PAYSTACK_WEBHOOK_SECRET; fall back to PAYSTACK_SECRET_KEY.
+	secret := strings.TrimSpace(s.cfg.PaystackWebhookSecret)
+	if secret == "" {
+		secret = s.cfg.PaystackSecretKey
+	}
+	if secret == "" || signature == "" {
 		return false
 	}
 	h := sha512.New()

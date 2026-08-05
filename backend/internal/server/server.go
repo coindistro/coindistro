@@ -303,10 +303,10 @@ func New(cfg *config.Config) (*Server, error) {
 	var earningsSvc *earningsservice.Service
 	var earningsHandlers *earningshandlers.Handlers
 
-	// Read API keys from config (read directly from env because these are
-	// secrets not modeled in the viper Config struct).
-	paystackSecretKey := os.Getenv("COINDISTRO_PAYSTACK_SECRET_KEY")
-	paystackPublicKey := os.Getenv("COINDISTRO_PAYSTACK_PUBLIC_KEY")
+	// Paystack credentials are loaded exclusively from PAYSTACK_* env vars so
+	// the PurpleSoftHub (dev) or future CoinDistro account can be swapped by
+	// changing environment variables only — no code changes.
+	paystack := config.LoadPaystackCredentials()
 	flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
 	flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
 	flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
@@ -315,15 +315,31 @@ func New(cfg *config.Config) (*Server, error) {
 	// only returning 503 EARNINGS_GATEWAY_NOT_CONFIGURED when a user hits
 	// /api/v1/investments/paystack/init. Missing keys mean payment init will
 	// fail for every caller.
-	if paystackSecretKey == "" {
-		log.Warn("payment gateway not configured: COINDISTRO_PAYSTACK_SECRET_KEY is empty",
-			zap.String("env_var", "COINDISTRO_PAYSTACK_SECRET_KEY"),
+	if paystack.SecretKey == "" {
+		log.Warn("payment gateway not configured: PAYSTACK_SECRET_KEY is empty",
+			zap.String("env_var", "PAYSTACK_SECRET_KEY"),
 			zap.String("impact", "POST /api/v1/investments/paystack/init and POST /api/v1/payments/paystack/init will return 503 EARNINGS_GATEWAY_NOT_CONFIGURED"),
 		)
+	} else {
+		log.Info("Paystack gateway configured from environment",
+			zap.Bool("has_public_key", paystack.PublicKey != ""),
+			zap.Bool("has_callback_url", paystack.CallbackURL != ""),
+			zap.Bool("has_webhook_secret", paystack.WebhookSecret != ""),
+		)
 	}
-	if paystackPublicKey == "" {
-		log.Warn("payment gateway not configured: COINDISTRO_PAYSTACK_PUBLIC_KEY is empty",
-			zap.String("env_var", "COINDISTRO_PAYSTACK_PUBLIC_KEY"),
+	if paystack.PublicKey == "" {
+		log.Warn("payment gateway: PAYSTACK_PUBLIC_KEY is empty",
+			zap.String("env_var", "PAYSTACK_PUBLIC_KEY"),
+		)
+	}
+	if paystack.CallbackURL == "" {
+		log.Warn("payment gateway: PAYSTACK_CALLBACK_URL is empty; falling back to BaseURL-derived callback",
+			zap.String("env_var", "PAYSTACK_CALLBACK_URL"),
+		)
+	}
+	if paystack.WebhookSecret == "" {
+		log.Warn("payment gateway: PAYSTACK_WEBHOOK_SECRET is empty; webhook HMAC will use PAYSTACK_SECRET_KEY",
+			zap.String("env_var", "PAYSTACK_WEBHOOK_SECRET"),
 		)
 	}
 	if flutterwaveSecretKey == "" {
@@ -346,8 +362,10 @@ func New(cfg *config.Config) (*Server, error) {
 
 	investmentCfg := investservice.Config{
 		BaseURL:               cfg.App.BaseURL,
-		PaystackSecretKey:     paystackSecretKey,
-		PaystackPublicKey:     paystackPublicKey,
+		PaystackSecretKey:     paystack.SecretKey,
+		PaystackPublicKey:     paystack.PublicKey,
+		PaystackCallbackURL:   paystack.CallbackURL,
+		PaystackWebhookSecret: paystack.SignatureSecret(),
 		FlutterwaveSecretKey:  flutterwaveSecretKey,
 		FlutterwavePublicKey:  flutterwavePublicKey,
 		FlutterwaveSecretHash: flutterwaveSecretHash,
@@ -356,8 +374,10 @@ func New(cfg *config.Config) (*Server, error) {
 	earningsCfg := earningsservice.Config{
 		BaseURL:               cfg.App.BaseURL,
 		AppURL:                cfg.App.BaseURL,
-		PaystackSecretKey:     paystackSecretKey,
-		PaystackPublicKey:     paystackPublicKey,
+		PaystackSecretKey:     paystack.SecretKey,
+		PaystackPublicKey:     paystack.PublicKey,
+		PaystackCallbackURL:   paystack.CallbackURL,
+		PaystackWebhookSecret: paystack.SignatureSecret(),
 		FlutterwaveSecretKey:  flutterwaveSecretKey,
 		FlutterwavePublicKey:  flutterwavePublicKey,
 		FlutterwaveSecretHash: flutterwaveSecretHash,

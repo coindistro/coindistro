@@ -3,12 +3,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@coindistro/cds";
 import { CreditCard, Sparkles } from "lucide-react";
-import {
-  ENABLED_PLANS,
-  PAYSTACK_PAYMENT_LINK,
-  type InvestmentPlanConfig,
-} from "@/features/earn/config/investment-plans";
+import { ENABLED_PLANS, type InvestmentPlanConfig } from "@/features/earn/config/investment-plans";
 import { formatCurrency } from "@/features/earn/utils";
+import * as investmentApi from "@/features/investments/api";
+import { ApiError } from "@/lib/api/types";
 
 interface InvestmentModalProps {
   open: boolean;
@@ -20,6 +18,7 @@ interface InvestmentModalProps {
 export function InvestmentModal({ open, plan, exchangeRate, onClose }: InvestmentModalProps) {
   const [paying, setPaying] = useState(false);
   const [provider, setProvider] = useState<"paystack" | "flutterwave">("paystack");
+  const [error, setError] = useState<string | null>(null);
 
   // Genesis is the first/default investment option when no plan is pre-selected.
   const resolvedPlan = plan ?? ENABLED_PLANS[0] ?? null;
@@ -28,21 +27,41 @@ export function InvestmentModal({ open, plan, exchangeRate, onClose }: Investmen
     if (!open) {
       setPaying(false);
       setProvider("paystack");
+      setError(null);
     }
   }, [open]);
 
-  const handlePayClick = useCallback(() => {
-    // TODO:
-    // Restore API-based Paystack / Flutterwave initialization
-    // after payment gateway integration is completed.
-    // Current implementation uses hosted Paystack Payment Link.
+  const handlePayClick = useCallback(async () => {
+    if (!resolvedPlan) return;
     setPaying(true);
-    const popup = window.open(PAYSTACK_PAYMENT_LINK, "_blank");
-    if (!popup) {
-      window.location.href = PAYSTACK_PAYMENT_LINK;
+    setError(null);
+    try {
+      // Backend initializes the transaction with PAYSTACK_SECRET_KEY (or Flutterwave)
+      // and returns authorization_url. No hosted payment links on the frontend.
+      const result =
+        provider === "flutterwave"
+          ? await investmentApi.initFlutterwavePayment(resolvedPlan.usdAmount)
+          : await investmentApi.initPaystackPayment(resolvedPlan.usdAmount);
+
+      if (!result?.authorization_url) {
+        setError("Payment initialization did not return a checkout URL. Please try again.");
+        return;
+      }
+
+      // Redirect to gateway checkout; webhook verifies and activates investment.
+      window.location.assign(result.authorization_url);
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Could not start payment. Please try again.";
+      setError(message);
+    } finally {
+      setPaying(false);
     }
-    setPaying(false);
-  }, []);
+  }, [provider, resolvedPlan]);
 
   if (!resolvedPlan) return null;
 
@@ -121,15 +140,10 @@ export function InvestmentModal({ open, plan, exchangeRate, onClose }: Investmen
                 Flutterwave
               </Button>
             </div>
-            {provider === "flutterwave" ? (
-              <p className="text-xs text-muted-foreground">
-                Flutterwave checkout uses the same temporary hosted payment flow until full gateway wiring is restored.
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                You will be redirected to Paystack to complete payment.
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Secure checkout is initialized by CoinDistro&apos;s backend. You will complete payment
+              on {provider === "flutterwave" ? "Flutterwave" : "Paystack"}, then return here.
+            </p>
           </div>
 
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
@@ -138,29 +152,28 @@ export function InvestmentModal({ open, plan, exchangeRate, onClose }: Investmen
               <span className="font-medium">Secure checkout</span>
             </div>
             <p className="mt-1">
-              Processing Time: Up to 24 Hours after payment confirmation for wallet credit.
+              After successful payment, your investment is activated automatically via webhook
+              verification. Daily rewards start on the next business day.
             </p>
           </div>
 
-          <div className="rounded-lg border border-info/40 bg-info/10 p-4 text-sm text-info">
-            <p className="font-medium">Payment Processing Notice</p>
-            <p className="mt-1">
-              After completing your payment, your CoinDistro wallet will be credited manually within{" "}
-              <strong>24 hours</strong> after payment confirmation.
-            </p>
-            <p className="mt-1">
-              Please ensure you use the same email address associated with your CoinDistro account when making payment.
-            </p>
-          </div>
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {error}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={paying}>
             Cancel
           </Button>
-          <Button type="button" onClick={handlePayClick} disabled={paying}>
+          <Button type="button" onClick={() => void handlePayClick()} disabled={paying}>
             {paying
-              ? "Redirecting..."
+              ? "Starting checkout..."
               : provider === "flutterwave"
                 ? "Pay with Flutterwave"
                 : "Pay with Paystack"}

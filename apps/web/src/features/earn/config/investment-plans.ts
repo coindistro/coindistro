@@ -198,5 +198,3 @@ export const INVESTMENT_PLANS: readonly InvestmentPlanConfig[] = [
 export const ENABLED_PLANS = INVESTMENT_PLANS.filter(
   (plan) => plan.enabled && !plan.futureActive,
 );
-
-export const PAYSTACK_PAYMENT_LINK = "https://paystack.shop/pay/coindistro";
