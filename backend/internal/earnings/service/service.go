@@ -238,13 +238,13 @@ func (s *Service) DeleteFeeTier(ctx context.Context, id string) error {
 
 func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
 	req.Normalize()
+	if s.cfg.PaystackSecretKey == "" {
+		s.logger.Error("Initializing Paystack transaction failed: gateway not configured")
+		return nil, errors.ErrGatewayNotConfigured
+	}
 	if !s.hasStore() {
-		reference := fmt.Sprintf("EARN-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
-		return &models.InitEarningsPaymentResponse{
-			AuthorizationURL: fmt.Sprintf("%s/checkout/paystack/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
-			Reference:        reference,
-			AccessCode:       "fallback",
-		}, nil
+		s.logger.Error("Initializing Paystack transaction failed: database store unavailable")
+		return nil, errors.ErrGatewayNotConfigured
 	}
 	settings, rate, err := s.validateInvestmentRequest(ctx, req)
 	if err != nil {
@@ -253,6 +253,14 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 
 	amountNGN := req.AmountUSD * rate.USDTNGN
 	reference := fmt.Sprintf("EARN-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
+
+	s.logger.Info("Initializing Paystack transaction",
+		zap.String("user_id", userID),
+		zap.String("reference", reference),
+		zap.Float64("amount_usd", req.AmountUSD),
+		zap.Float64("amount_ngn", amountNGN),
+		zap.String("currency", req.Currency),
+	)
 
 	// Create pending payment transaction
 	pt := &models.EarningsPaymentTransaction{
@@ -280,9 +288,13 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		return nil, errors.ErrEmailRequired
 	}
 
-	// Call Paystack initialize API
+	// Call Paystack initialize API (secret key from PAYSTACK_SECRET_KEY only).
 	authURL, accessCode, err := s.callPaystackInitialize(ctx, amountNGN, req.Currency, reference, userID, email)
 	if err != nil {
+		s.logger.Error("Paystack initialize API failed",
+			zap.String("reference", reference),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -315,11 +327,74 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		"provider": "paystack", "reference": reference, "amount_usd": req.AmountUSD,
 	})
 
+	s.logger.Info("Paystack checkout ready",
+		zap.String("reference", reference),
+		zap.String("investment_id", inv.ID),
+		zap.String("customer_email", email),
+		zap.Float64("amount_ngn", amountNGN),
+		zap.String("callback_url", s.paystackCallbackURL()),
+	)
+
 	return &models.InitEarningsPaymentResponse{
 		AuthorizationURL: authURL,
 		Reference:        reference,
 		AccessCode:       accessCode,
 	}, nil
+}
+
+// VerifyPaystackPayment confirms a checkout after the user returns from Paystack
+// (or if the webhook is delayed). It re-verifies with Paystack's API — never trusts the client.
+func (s *Service) VerifyPaystackPayment(ctx context.Context, userID, reference string) (*models.EarningsInvestment, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return nil, apperrors.ErrBadRequest
+	}
+	if !s.hasStore() {
+		return nil, errors.ErrGatewayNotConfigured
+	}
+	if s.cfg.PaystackSecretKey == "" {
+		return nil, errors.ErrGatewayNotConfigured
+	}
+
+	inv, err := s.store.GetInvestmentByReference(ctx, "paystack", reference)
+	if err != nil {
+		return nil, err
+	}
+	if inv == nil || inv.UserID != userID {
+		return nil, errors.ErrInvestmentNotFound
+	}
+
+	// Already activated (webhook may have won the race).
+	if inv.Status == models.InvestmentStatusActive || inv.PaymentStatus == "completed" {
+		s.logger.Info("Paystack payment already verified",
+			zap.String("reference", reference),
+			zap.String("investment_id", inv.ID),
+			zap.String("status", string(inv.Status)),
+		)
+		return inv, nil
+	}
+
+	verified, err := s.verifyPaystackTransaction(ctx, reference)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		return nil, errors.ErrPaymentVerificationFailed
+	}
+
+	s.logger.Info("Verification succeeded",
+		zap.String("reference", reference),
+		zap.String("investment_id", inv.ID),
+	)
+
+	if err := s.processSuccessfulPayment(ctx, "paystack", reference, inv.AmountNGN, "NGN"); err != nil {
+		if err == errors.ErrPaymentAlreadyProcessed {
+			return s.store.GetInvestmentByReference(ctx, "paystack", reference)
+		}
+		return nil, err
+	}
+
+	return s.store.GetInvestmentByReference(ctx, "paystack", reference)
 }
 
 func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req *models.InitEarningsPaymentRequest) (*models.InitEarningsPaymentResponse, error) {
@@ -442,7 +517,10 @@ func (s *Service) validateInvestmentRequest(ctx context.Context, req *models.Ini
 // ─── Webhook Processing ─────────────────────────────────
 
 func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, signature string) error {
+	s.logger.Info("Webhook received", zap.String("provider", "paystack"))
+
 	if !s.verifyPaystackSignature(payload, signature) {
+		s.logger.Warn("Paystack webhook signature verification failed")
 		return errors.ErrInvalidSignature
 	}
 
@@ -462,11 +540,19 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 	}
 
 	if event.Event != "charge.success" {
+		s.logger.Info("Paystack webhook ignored (non-success event)",
+			zap.String("event", event.Event),
+		)
 		return nil
 	}
 
 	eventID := fmt.Sprintf("paystack-earnings-%d", event.Data.ID)
 	reference := event.Data.Reference
+
+	s.logger.Info("Processing Paystack charge.success",
+		zap.String("reference", reference),
+		zap.String("event_id", eventID),
+	)
 
 	// Deduplicate by checking if already processed
 	existing, err := s.store.GetPaymentTransactionByReference(ctx, "paystack", reference)
@@ -474,10 +560,13 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 		return err
 	}
 	if existing != nil && existing.Status == "completed" {
-		return errors.ErrPaymentAlreadyProcessed
+		s.logger.Info("Duplicate webhook ignored (already completed)",
+			zap.String("reference", reference),
+		)
+		return nil
 	}
 
-	// Verify payment with Paystack API
+	// Verify payment with Paystack API (never trust webhook body alone)
 	verified, err := s.verifyPaystackTransaction(ctx, reference)
 	if err != nil {
 		return err
@@ -485,12 +574,15 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 	if !verified {
 		return errors.ErrPaymentVerificationFailed
 	}
+	s.logger.Info("Verification succeeded", zap.String("reference", reference))
 
-	// Process the investment
+	// Process the investment (amount from Paystack is in kobo)
 	amountPaid := event.Data.Amount / 100
 	if err := s.processSuccessfulPayment(ctx, "paystack", reference, amountPaid, event.Data.Currency); err != nil {
-		// Log but don't return error for duplicate processing
 		if err == errors.ErrPaymentAlreadyProcessed {
+			s.logger.Info("Duplicate webhook ignored (investment already active)",
+				zap.String("reference", reference),
+			)
 			return nil
 		}
 		return err
@@ -504,6 +596,11 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 		Type:      "webhook",
 		Status:    "processed",
 	})
+
+	s.logger.Info("Investment activated",
+		zap.String("reference", reference),
+		zap.String("provider", "paystack"),
+	)
 
 	return nil
 }
@@ -618,7 +715,7 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
 	}
 
-	// Update investment to active
+	// Update investment to active — ROI schedule starts from StartedAt / maturity.
 	inv.PaymentStatus = "completed"
 	inv.Status = models.InvestmentStatusActive
 	inv.StartedAt = &now
@@ -641,6 +738,20 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 	s.audit(ctx, inv.UserID, audit.ActionDeposit, "earnings_investment", inv.ID, map[string]interface{}{
 		"provider": provider, "reference": reference, "amount_usd": inv.AmountUSD,
 	})
+
+	s.logger.Info("Investment activated",
+		zap.String("investment_id", inv.ID),
+		zap.String("user_id", inv.UserID),
+		zap.String("provider", provider),
+		zap.String("reference", reference),
+		zap.Float64("amount_usd", inv.AmountUSD),
+		zap.Time("maturity_date", maturityDate),
+	)
+	s.logger.Info("ROI schedule started",
+		zap.String("investment_id", inv.ID),
+		zap.Int("max_business_days", inv.MaxBusinessDays),
+		zap.Float64("daily_reward_ngn", inv.DailyRewardNGN),
+	)
 
 	return nil
 }
@@ -1402,10 +1513,11 @@ func (s *Service) createNotification(ctx context.Context, userID, notifType, tit
 // ─── Payment Gateway API Calls ───────────────────────────
 
 func (s *Service) paystackCallbackURL() string {
-	if strings.TrimSpace(s.cfg.PaystackCallbackURL) != "" {
-		return strings.TrimSpace(s.cfg.PaystackCallbackURL)
+	// Must come from PAYSTACK_CALLBACK_URL (e.g. https://coindistro-hazel.vercel.app/app/earn).
+	if cb := strings.TrimSpace(s.cfg.PaystackCallbackURL); cb != "" {
+		return cb
 	}
-	// Fallback for local/dev when PAYSTACK_CALLBACK_URL is unset.
+	// Defensive fallback only — startup validation requires PAYSTACK_CALLBACK_URL.
 	base := strings.TrimRight(s.cfg.AppURL, "/")
 	if base == "" {
 		base = strings.TrimRight(s.cfg.BaseURL, "/")

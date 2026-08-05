@@ -152,16 +152,48 @@ export function EarnDashboard() {
     setInvestOpen(true);
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = React.useCallback(() => {
     setRefreshing(true);
     void Promise.all([
       dashboardQ.refetch(),
       rateQ.refetch(),
       settingsQ.refetch(),
+      walletQ.refetch(),
+      legacyInvestmentsQ.refetch(),
     ]).finally(() => {
       window.setTimeout(() => setRefreshing(false), 600);
     });
-  };
+  }, [dashboardQ, rateQ, settingsQ, walletQ, legacyInvestmentsQ]);
+
+  // After Paystack redirects back to /app/earn?reference=...&trxref=...,
+  // verify the payment and refresh dashboard without a manual reload.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") || params.get("trxref");
+    if (!reference) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await investmentApi.verifyPaystackPayment(reference);
+      } catch {
+        // Webhook may already have activated the investment; still refresh UI.
+      } finally {
+        if (cancelled) return;
+        // Strip gateway query params so refresh doesn't re-run verify forever.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("reference");
+        url.searchParams.delete("trxref");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+        handleRefresh();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleRefresh]);
 
   const submitWithdrawal = async (withdrawAmount: number) => {
     setWithdrawing(true);

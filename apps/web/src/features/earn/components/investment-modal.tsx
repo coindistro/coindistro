@@ -48,8 +48,8 @@ export function InvestmentModal({ open, plan, exchangeRate, onClose }: Investmen
         return;
       }
 
-      // Redirect to gateway checkout; webhook verifies and activates investment.
-      window.location.assign(result.authorization_url);
+      // Redirect immediately to Paystack checkout (authorization_url from Initialize Transaction).
+      window.location.href = result.authorization_url;
     } catch (err) {
       const message =
         err instanceof ApiError

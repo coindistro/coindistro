@@ -225,13 +225,11 @@ func (s *Service) GetPricingHistory(ctx context.Context) ([]*models.Pricing, err
 // ─── Payment Initialization ───────────────────────────
 
 func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *models.InitPaymentRequest) (*models.InitPaymentResponse, error) {
+	if s.cfg.PaystackSecretKey == "" {
+		return nil, errors.ErrGatewayNotConfigured
+	}
 	if !s.hasStore() {
-		reference := fmt.Sprintf("CDT-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
-		return &models.InitPaymentResponse{
-			AuthorizationURL: fmt.Sprintf("%s/checkout/paystack/%s", strings.TrimRight(s.cfg.BaseURL, "/"), reference),
-			Reference:        reference,
-			AccessCode:       "fallback",
-		}, nil
+		return nil, errors.ErrGatewayNotConfigured
 	}
 
 	plan, pricing, err := s.validateInvestmentRequest(ctx, req)

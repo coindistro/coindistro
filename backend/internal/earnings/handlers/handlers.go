@@ -182,12 +182,43 @@ func (h *Handlers) InitPaystackPayment(c *gin.Context) {
 		response.BadRequest(c, "amount_usd is required")
 		return
 	}
+	h.logger.Info("Initializing Paystack transaction",
+		zap.String("user_id", c.GetString("user_id")),
+		zap.Float64("amount_usd", req.AmountUSD),
+	)
 	resp, err := h.svc.InitPaystackPayment(c.Request.Context(), c.GetString("user_id"), &req)
 	if err != nil {
+		h.logger.Error("Paystack init failed", zap.Error(err))
 		response.HandleError(c, err)
 		return
 	}
 	response.OK(c, "Payment initialized", resp)
+}
+
+// VerifyPaystackPayment re-verifies a Paystack checkout after the browser returns
+// from the gateway (reference query param). Complements the webhook path.
+func (h *Handlers) VerifyPaystackPayment(c *gin.Context) {
+	reference := c.Query("reference")
+	if reference == "" {
+		reference = c.Query("trxref")
+	}
+	if reference == "" {
+		var body struct {
+			Reference string `json:"reference"`
+		}
+		_ = c.ShouldBindJSON(&body)
+		reference = body.Reference
+	}
+	inv, err := h.svc.VerifyPaystackPayment(c.Request.Context(), c.GetString("user_id"), reference)
+	if err != nil {
+		h.logger.Error("Paystack verify failed",
+			zap.String("reference", reference),
+			zap.Error(err),
+		)
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, "Payment verified", inv)
 }
 
 // InitFlutterwavePayment initializes a Flutterwave checkout.
@@ -387,6 +418,8 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 	{
 		authed.GET("/dashboard", h.GetDashboard)
 		authed.POST("/paystack/init", h.InitPaystackPayment)
+		authed.GET("/paystack/verify", h.VerifyPaystackPayment)
+		authed.POST("/paystack/verify", h.VerifyPaystackPayment)
 		authed.POST("/flutterwave/init", h.InitFlutterwavePayment)
 		authed.GET("/list", h.ListInvestments)
 		authed.GET("/rewards", h.GetRewardHistory)

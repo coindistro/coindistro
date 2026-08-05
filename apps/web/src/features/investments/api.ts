@@ -40,6 +40,13 @@ export async function initFlutterwavePayment(amountUsd: number): Promise<InitPay
   });
 }
 
+/** Re-verify Paystack payment after browser callback (reference / trxref). */
+export async function verifyPaystackPayment(reference: string): Promise<EarningsInvestment> {
+  return api.post<EarningsInvestment>("/api/v1/investments/paystack/verify", {
+    reference,
+  });
+}
+
 export async function listInvestments(page = 1, perPage = 20): Promise<EarningsSummary[]> {
   const data = await api.get<EarningsSummary[] | { items?: EarningsSummary[] }>(
     `/api/v1/investments/list?page=${page}&per_page=${perPage}`,

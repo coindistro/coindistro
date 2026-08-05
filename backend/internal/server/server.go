@@ -307,56 +307,40 @@ func New(cfg *config.Config) (*Server, error) {
 	// the PurpleSoftHub (dev) or future CoinDistro account can be swapped by
 	// changing environment variables only — no code changes.
 	paystack := config.LoadPaystackCredentials()
+	presence := paystack.PresenceStatus()
+	log.Info("PAYSTACK_SECRET_KEY: " + presence["PAYSTACK_SECRET_KEY"])
+	log.Info("PAYSTACK_PUBLIC_KEY: " + presence["PAYSTACK_PUBLIC_KEY"])
+	log.Info("PAYSTACK_CALLBACK_URL: " + presence["PAYSTACK_CALLBACK_URL"])
+	log.Info("PAYSTACK_WEBHOOK_SECRET: " + presence["PAYSTACK_WEBHOOK_SECRET"])
+
+	// Fail fast: never serve the API with a nil/unconfigured Paystack gateway.
+	// Root cause of EARNINGS_GATEWAY_NOT_CONFIGURED is an empty secret key at
+	// call time — catch it at boot so Render deploys fail until env is set.
+	if err := paystack.ValidateRequired(); err != nil {
+		return nil, err
+	}
+	log.Info("Gateway initialized",
+		zap.String("provider", "paystack"),
+		zap.String("callback_url", paystack.CallbackURL),
+	)
+
 	flutterwaveSecretKey := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_KEY")
 	flutterwavePublicKey := os.Getenv("COINDISTRO_FLUTTERWAVE_PUBLIC_KEY")
 	flutterwaveSecretHash := os.Getenv("COINDISTRO_FLUTTERWAVE_SECRET_HASH")
 
-	// Startup-time validation: fail fast with a descriptive warning instead of
-	// only returning 503 EARNINGS_GATEWAY_NOT_CONFIGURED when a user hits
-	// /api/v1/investments/paystack/init. Missing keys mean payment init will
-	// fail for every caller.
-	if paystack.SecretKey == "" {
-		log.Warn("payment gateway not configured: PAYSTACK_SECRET_KEY is empty",
-			zap.String("env_var", "PAYSTACK_SECRET_KEY"),
-			zap.String("impact", "POST /api/v1/investments/paystack/init and POST /api/v1/payments/paystack/init will return 503 EARNINGS_GATEWAY_NOT_CONFIGURED"),
-		)
-	} else {
-		log.Info("Paystack gateway configured from environment",
-			zap.Bool("has_public_key", paystack.PublicKey != ""),
-			zap.Bool("has_callback_url", paystack.CallbackURL != ""),
-			zap.Bool("has_webhook_secret", paystack.WebhookSecret != ""),
-		)
-	}
-	if paystack.PublicKey == "" {
-		log.Warn("payment gateway: PAYSTACK_PUBLIC_KEY is empty",
-			zap.String("env_var", "PAYSTACK_PUBLIC_KEY"),
-		)
-	}
-	if paystack.CallbackURL == "" {
-		log.Warn("payment gateway: PAYSTACK_CALLBACK_URL is empty; falling back to BaseURL-derived callback",
-			zap.String("env_var", "PAYSTACK_CALLBACK_URL"),
-		)
-	}
-	if paystack.WebhookSecret == "" {
-		log.Warn("payment gateway: PAYSTACK_WEBHOOK_SECRET is empty; webhook HMAC will use PAYSTACK_SECRET_KEY",
-			zap.String("env_var", "PAYSTACK_WEBHOOK_SECRET"),
-		)
-	}
 	if flutterwaveSecretKey == "" {
-		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_SECRET_KEY is empty",
+		log.Warn("optional gateway: COINDISTRO_FLUTTERWAVE_SECRET_KEY is empty",
 			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_SECRET_KEY"),
-			zap.String("impact", "POST /api/v1/investments/flutterwave/init and POST /api/v1/payments/flutterwave/init will return 503 EARNINGS_GATEWAY_NOT_CONFIGURED"),
 		)
 	}
 	if flutterwavePublicKey == "" {
-		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_PUBLIC_KEY is empty",
+		log.Warn("optional gateway: COINDISTRO_FLUTTERWAVE_PUBLIC_KEY is empty",
 			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_PUBLIC_KEY"),
 		)
 	}
 	if flutterwaveSecretHash == "" {
-		log.Warn("payment gateway not configured: COINDISTRO_FLUTTERWAVE_SECRET_HASH is empty",
+		log.Warn("optional gateway: COINDISTRO_FLUTTERWAVE_SECRET_HASH is empty",
 			zap.String("env_var", "COINDISTRO_FLUTTERWAVE_SECRET_HASH"),
-			zap.String("impact", "Flutterwave webhook signature verification will fail"),
 		)
 	}
 
