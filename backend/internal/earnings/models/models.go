@@ -276,12 +276,15 @@ type EarningsDashboard struct {
 	// CapitalInvested aliases TotalInvested for portfolio clients.
 	CapitalInvestedUSD float64 `json:"capital_invested_usd"`
 	CapitalInvestedNGN float64 `json:"capital_invested_ngn"`
-	// LockedBalance is investment capital still locked in active plans.
+	// LockedBalance is capital + still-locked profit/referrals (wallet.locked).
 	LockedBalanceUSD float64 `json:"locked_balance_usd"`
 	LockedBalanceNGN float64 `json:"locked_balance_ngn"`
+	// AvailableBalanceUSD is free cash in the investor wallet (wallet.available).
+	AvailableBalanceUSD float64 `json:"available_balance_usd"`
 	// WithdrawableBalance is earnings that can be withdrawn when referrals unlock.
 	// Zero while WithdrawalsUnlocked is false (capital stays locked separately).
 	WithdrawableBalanceNGN float64 `json:"withdrawable_balance_ngn"`
+	WithdrawableBalanceUSD float64 `json:"withdrawable_balance_usd"`
 	// ROIPercentage = (profit / capital) * 100 across the portfolio.
 	ROIPercentage        float64 `json:"roi_percentage"`
 	TodayEarningsNGN     float64 `json:"today_earnings_ngn"`
@@ -289,6 +292,7 @@ type EarningsDashboard struct {
 	AvailableBalanceNGN  float64 `json:"available_balance_ngn"`
 	PendingWithdrawalNGN float64 `json:"pending_withdrawal_ngn"`
 	ReferralEarningsNGN  float64 `json:"referral_earnings_ngn"`
+	ReferralEarningsUSD  float64 `json:"referral_earnings_usd"`
 	ActiveInvestments    int     `json:"active_investments"`
 	CompletedInvestments int     `json:"completed_investments"`
 	ExchangeRate         float64 `json:"exchange_rate"`

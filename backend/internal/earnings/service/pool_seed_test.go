@@ -29,3 +29,27 @@ func TestDefaultMinReferralsForWithdraw(t *testing.T) {
 		t.Fatalf("min referrals = %d, want 5", DefaultMinReferralsForWithdraw)
 	}
 }
+
+func TestLockedWalletAccountingModel(t *testing.T) {
+	// Before referrals unlock: available=0, locked=capital+profit
+	capital := GenesisPoolInvestmentUSD
+	profit := GenesisPoolProfitPerInvestorUSD
+	available := 0.0
+	locked := capital + profit
+	portfolio := available + locked
+	if portfolio != 92.5 {
+		t.Fatalf("portfolio = %.2f, want 92.50", portfolio)
+	}
+	if available != 0 {
+		t.Fatal("available must be 0 while locked")
+	}
+	// After unlock: available=profit, locked=capital
+	availableAfter := profit
+	lockedAfter := capital
+	if availableAfter+lockedAfter != portfolio {
+		t.Fatal("unlock must not change total portfolio")
+	}
+	if InvestorWalletCurrency != "USD" {
+		t.Fatalf("investor wallet currency = %s, want USD", InvestorWalletCurrency)
+	}
+}

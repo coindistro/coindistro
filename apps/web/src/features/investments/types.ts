@@ -79,7 +79,10 @@ export interface EarningsDashboard {
   capital_invested_ngn?: number;
   locked_balance_usd?: number;
   locked_balance_ngn?: number;
+  available_balance_usd?: number;
   withdrawable_balance_ngn?: number;
+  withdrawable_balance_usd?: number;
+  referral_earnings_usd?: number;
   roi_percentage?: number;
   today_earnings_ngn: number;
   monthly_earnings_ngn: number;

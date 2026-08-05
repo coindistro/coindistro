@@ -726,6 +726,16 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		return err
 	}
 
+	// Lock investment capital in the investor USD wallet (idempotent).
+	if err := s.creditLockedWallet(ctx, inv.UserID, inv.AmountUSD, "investment",
+		fmt.Sprintf("CAPITAL-%s", inv.ID),
+		fmt.Sprintf("Locked investment capital $%.2f (%s)", inv.AmountUSD, reference)); err != nil {
+		s.logger.Warn("failed to lock investment capital in wallet",
+			zap.String("investment_id", inv.ID),
+			zap.Error(err),
+		)
+	}
+
 	// Process referral commission for the referred user
 	s.processReferralCommission(ctx, inv)
 
@@ -846,6 +856,18 @@ func (s *Service) processDailyReward(ctx context.Context, inv *models.EarningsIn
 		return err
 	}
 
+	// Credit daily reward into locked wallet (USD), unlock later with referrals.
+	rate, _ := s.store.GetExchangeRate(ctx)
+	exchangeRate := 1400.0
+	if rate != nil && rate.USDTNGN > 0 {
+		exchangeRate = rate.USDTNGN
+	}
+	rewardUSD := amount / exchangeRate
+	_ = s.creditLockedWallet(ctx, inv.UserID, rewardUSD, "roi",
+		fmt.Sprintf("DAILY-%s-%d", inv.ID, nextBusinessDay),
+		fmt.Sprintf("Locked daily reward day %d: ₦%.2f (~$%.2f)", nextBusinessDay, amount, rewardUSD))
+	_, _ = s.UnlockEligibleEarnings(ctx, inv.UserID)
+
 	s.logger.Info("daily reward credited",
 		zap.String("investment_id", inv.ID),
 		zap.String("user_id", inv.UserID),
@@ -860,6 +882,257 @@ func (s *Service) processDailyReward(ctx context.Context, inv *models.EarningsIn
 		map[string]interface{}{"investment_id": inv.ID, "amount": amount, "day": nextBusinessDay})
 
 	return nil
+}
+
+// ─── Wallet locked / available (USD investor ledger) ───────
+
+// InvestorWalletCurrency is the unit used for Available vs Locked portfolio balances.
+const InvestorWalletCurrency = "USD"
+
+// creditLockedWallet posts to locked_balance with idempotent reference.
+func (s *Service) creditLockedWallet(ctx context.Context, userID string, amount float64, txType, reference, description string) error {
+	if amount <= 0 || !s.hasStore() {
+		return nil
+	}
+	w, err := s.store.GetOrCreateWalletBalances(ctx, userID, InvestorWalletCurrency)
+	if err != nil {
+		return err
+	}
+	return s.store.CreditWalletLocked(ctx, w.ID, amount, txType, reference, description)
+}
+
+// UnlockEligibleEarnings moves profit + referral earnings from locked → available
+// when successful_referrals >= min. Capital remains locked. Idempotent.
+func (s *Service) UnlockEligibleEarnings(ctx context.Context, userID string) (unlocked float64, err error) {
+	if !s.hasStore() {
+		return 0, nil
+	}
+	settings, _ := s.store.GetSettings(ctx)
+	minRefs := DefaultMinReferralsForWithdraw
+	if settings != nil && settings.MinReferralsForPayout > 0 {
+		minRefs = settings.MinReferralsForPayout
+	}
+	refs, err := s.store.CountSuccessfulReferrals(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	if refs < minRefs {
+		return 0, nil
+	}
+
+	// Eligible earnings = investment rewards + paid referral commissions.
+	// Capital (active investment principal) stays locked.
+	rewards, err := s.store.SumRewardsByUser(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	// Convert NGN rewards to USD for the USD wallet.
+	rate, _ := s.store.GetExchangeRate(ctx)
+	exchangeRate := 1400.0
+	if rate != nil && rate.USDTNGN > 0 {
+		exchangeRate = rate.USDTNGN
+	}
+	rewardUSD := 0.0
+	if exchangeRate > 0 {
+		rewardUSD = rewards / exchangeRate
+	}
+	// Also sum investment.TotalEarned if rewards are in USD terms from pool seeds...
+	// Pool seeds store NGN (profit * rate). Capital is credited in USD.
+	// Referral commissions are NGN.
+	referralNGN, _ := s.store.SumReferralCommissionsByReferrer(ctx, userID, "")
+	referralUSD := 0.0
+	if exchangeRate > 0 {
+		referralUSD = referralNGN / exchangeRate
+	}
+	eligible := rewardUSD + referralUSD
+	if eligible <= 0 {
+		return 0, nil
+	}
+
+	w, err := s.store.GetOrCreateWalletBalances(ctx, userID, InvestorWalletCurrency)
+	if err != nil {
+		return 0, err
+	}
+	// Cap unlock to locked minus capital still active.
+	capitalUSD, _ := s.sumActiveCapitalUSD(ctx, userID)
+	maxUnlock := w.Locked - capitalUSD
+	if maxUnlock < 0 {
+		maxUnlock = 0
+	}
+	if eligible > maxUnlock {
+		// Prefer unlocking whatever is above capital
+		eligible = maxUnlock
+	}
+	if eligible <= 0 {
+		// If capital not posted yet but profits are in locked, unlock min(eligible, locked)
+		if w.Locked > 0 && capitalUSD <= 0 {
+			eligible = rewardUSD + referralUSD
+			if eligible > w.Locked {
+				eligible = w.Locked
+			}
+		} else {
+			return 0, nil
+		}
+	}
+
+	ref := fmt.Sprintf("UNLOCK-EARNINGS-%s", userID)
+	desc := fmt.Sprintf("Unlock investment profit and referral earnings after %d successful referrals", refs)
+	if err := s.store.TransferLockedToAvailable(ctx, w.ID, eligible, ref, desc); err != nil {
+		return 0, err
+	}
+	s.audit(ctx, userID, audit.ActionEarningsCredited, "wallet", w.ID, map[string]interface{}{
+		"type":            "unlock_earnings",
+		"amount_usd":      eligible,
+		"successful_refs": refs,
+	})
+	s.createNotification(ctx, userID, "withdrawals_unlocked",
+		"Withdrawals Unlocked",
+		fmt.Sprintf("$%.2f moved from Locked to Available. You can now request withdrawals.", eligible),
+		map[string]interface{}{"amount_usd": eligible, "referrals": refs})
+	_ = s.store.InsertActivityEvent(ctx, userID, "wallet.earnings_unlocked", map[string]interface{}{
+		"amount_usd": fmt.Sprintf("%.2f", eligible),
+		"referrals":  fmt.Sprintf("%d", refs),
+	})
+	s.logger.Info("Eligible earnings unlocked to available",
+		zap.String("user_id", userID),
+		zap.Float64("amount_usd", eligible),
+		zap.Int("referrals", refs),
+	)
+	return eligible, nil
+}
+
+func (s *Service) sumActiveCapitalUSD(ctx context.Context, userID string) (float64, error) {
+	investments, _, err := s.store.ListUserInvestments(ctx, userID, "active", 1, 500)
+	if err != nil {
+		return 0, err
+	}
+	var sum float64
+	for _, inv := range investments {
+		sum += inv.AmountUSD
+	}
+	return sum, nil
+}
+
+// SyncInvestorWallet ensures capital and profit sit in Locked (or Available after unlock)
+// using ledger-backed idempotent wallet transactions. No raw balance overwrites.
+func (s *Service) SyncInvestorWallet(ctx context.Context, userID string) error {
+	if !s.hasStore() {
+		return nil
+	}
+	// 1) Ensure active capital is locked
+	investments, _, err := s.store.ListUserInvestments(ctx, userID, "", 1, 500)
+	if err != nil {
+		return err
+	}
+	for _, inv := range investments {
+		if inv.Status != models.InvestmentStatusActive && inv.Status != models.InvestmentStatusCompleted {
+			continue
+		}
+		if inv.Status == models.InvestmentStatusActive {
+			ref := fmt.Sprintf("CAPITAL-%s", inv.ID)
+			_ = s.creditLockedWallet(ctx, userID, inv.AmountUSD, "investment", ref,
+				fmt.Sprintf("Locked investment capital $%.2f", inv.AmountUSD))
+		}
+	}
+
+	// 2) Ensure profit is locked (or was unlocked)
+	rate, _ := s.store.GetExchangeRate(ctx)
+	exchangeRate := 1400.0
+	if rate != nil && rate.USDTNGN > 0 {
+		exchangeRate = rate.USDTNGN
+	}
+	// Per-investment earned → locked credit
+	for _, inv := range investments {
+		if inv.TotalEarnedNGN <= 0 {
+			continue
+		}
+		profitUSD := inv.TotalEarnedNGN / exchangeRate
+		ref := fmt.Sprintf("PROFIT-%s", inv.ID)
+		// If old seed credited to available with POOL- prefix, move to locked first.
+		w, werr := s.store.GetOrCreateWalletBalances(ctx, userID, InvestorWalletCurrency)
+		if werr == nil {
+			oldRef := fmt.Sprintf("POOL-%s", inv.ID)
+			if len(inv.ID) >= 8 {
+				oldRef = fmt.Sprintf("POOL-%s", inv.ID[:8])
+			}
+			// Correct mis-posted available profit into locked (idempotent adjust).
+			_ = s.store.MoveAvailableToLocked(ctx, w.ID, profitUSD,
+				fmt.Sprintf("RELOCK-%s", inv.ID),
+				"Move previously available profit into locked balance")
+			_ = oldRef
+		}
+		_ = s.creditLockedWallet(ctx, userID, profitUSD, "roi", ref,
+			fmt.Sprintf("Locked investment profit $%.2f", profitUSD))
+	}
+
+	// 3) Attempt unlock if referrals satisfied
+	_, _ = s.UnlockEligibleEarnings(ctx, userID)
+	return nil
+}
+
+// SyncAllInvestorWallets walks active investors and syncs locked/available wallets.
+func (s *Service) SyncAllInvestorWallets(ctx context.Context) (int, error) {
+	if !s.hasStore() {
+		return 0, nil
+	}
+	investments, err := s.store.ListActiveInvestments(ctx, 1000)
+	if err != nil {
+		return 0, err
+	}
+	seen := map[string]struct{}{}
+	n := 0
+	for _, inv := range investments {
+		if _, ok := seen[inv.UserID]; ok {
+			continue
+		}
+		seen[inv.UserID] = struct{}{}
+		if err := s.SyncInvestorWallet(ctx, inv.UserID); err != nil {
+			s.logger.Warn("wallet sync failed", zap.String("user_id", inv.UserID), zap.Error(err))
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
+// PlatformReconciliation summarizes available vs locked across investor wallets.
+func (s *Service) PlatformReconciliation(ctx context.Context) (map[string]interface{}, error) {
+	avail, locked, total, users, err := s.store.SumPlatformWalletBalances(ctx, InvestorWalletCurrency)
+	if err != nil {
+		return nil, err
+	}
+	// Count locked vs eligible
+	investments, _ := s.store.ListActiveInvestments(ctx, 2000)
+	lockedUsers := 0
+	eligibleUsers := 0
+	seen := map[string]struct{}{}
+	settings, _ := s.store.GetSettings(ctx)
+	minRefs := DefaultMinReferralsForWithdraw
+	if settings != nil && settings.MinReferralsForPayout > 0 {
+		minRefs = settings.MinReferralsForPayout
+	}
+	for _, inv := range investments {
+		if _, ok := seen[inv.UserID]; ok {
+			continue
+		}
+		seen[inv.UserID] = struct{}{}
+		refs, _ := s.store.CountSuccessfulReferrals(ctx, inv.UserID)
+		if refs >= minRefs {
+			eligibleUsers++
+		} else {
+			lockedUsers++
+		}
+	}
+	return map[string]interface{}{
+		"currency":                     InvestorWalletCurrency,
+		"total_available_balance":      avail,
+		"total_locked_balance":         locked,
+		"total_portfolio_value":        total,
+		"wallet_rows":                  users,
+		"users_with_locked_withdrawals": lockedUsers,
+		"users_eligible_to_withdraw":   eligibleUsers,
+		"min_referrals_required":       minRefs,
+	}, nil
 }
 
 // ─── Genesis pool profit credit (auditable earnings engine) ─
@@ -988,25 +1261,28 @@ func (s *Service) SeedPoolProfits(
 			return nil, err
 		}
 
-		// Wallet ledger (NGN available) + wallet_transactions — not a fake balance:
-		// mirrors the credited reward amount on the multi-currency wallet.
-		walletID, _, _, werr := s.store.GetOrCreateCurrencyWallet(ctx, inv.UserID, "NGN")
-		if werr == nil && walletID != "" {
-			ref := fmt.Sprintf("POOL-%s", inv.ID[:8])
-			desc := fmt.Sprintf("Genesis pool profit $%.2f (₦%.2f) for investment %s", profitPerInvestorUSD, profitNGN, inv.ID)
-			if err := s.store.CreditWalletAvailable(ctx, walletID, profitNGN, "reward", ref, desc); err != nil {
-				s.logger.Warn("wallet credit failed (reward ledger still recorded)",
-					zap.String("user_id", inv.UserID),
-					zap.Error(err),
-				)
-			} else {
-				s.logger.Info("Wallet credited",
-					zap.String("user_id", inv.UserID),
-					zap.String("wallet_id", walletID),
-					zap.Float64("amount_ngn", profitNGN),
-				)
-			}
+		// Lock investment capital + profit in USD wallet (visible, not withdrawable).
+		// Capital
+		_ = s.creditLockedWallet(ctx, inv.UserID, inv.AmountUSD, "investment",
+			fmt.Sprintf("CAPITAL-%s", inv.ID),
+			fmt.Sprintf("Locked investment capital $%.2f", inv.AmountUSD))
+		// Profit (locked until referrals unlock)
+		if err := s.creditLockedWallet(ctx, inv.UserID, profitPerInvestorUSD, "roi",
+			fmt.Sprintf("PROFIT-%s", inv.ID),
+			fmt.Sprintf("Locked Genesis pool profit $%.2f (₦%.2f)", profitPerInvestorUSD, profitNGN)); err != nil {
+			s.logger.Warn("locked wallet profit credit failed (reward ledger still recorded)",
+				zap.String("user_id", inv.UserID),
+				zap.Error(err),
+			)
+		} else {
+			s.logger.Info("Wallet locked profit credited",
+				zap.String("user_id", inv.UserID),
+				zap.Float64("profit_usd", profitPerInvestorUSD),
+				zap.Float64("locked_portfolio_usd", inv.AmountUSD+profitPerInvestorUSD),
+			)
 		}
+		// Best-effort: if referrals already met, unlock earnings now.
+		_, _ = s.UnlockEligibleEarnings(ctx, inv.UserID)
 
 		// Audit log
 		s.audit(ctx, inv.UserID, audit.ActionEarningsCredited, "earnings_investment", inv.ID, map[string]interface{}{
@@ -1145,19 +1421,31 @@ func (s *Service) RequestWithdrawal(ctx context.Context, userID string, req *mod
 }
 
 func (s *Service) processEarningsWithdrawal(ctx context.Context, userID string, amount float64, settings *models.InvestmentSettings) (*models.Withdrawal, error) {
-	// Check total earnings
-	totalEarnings, err := s.store.SumRewardsByUser(ctx, userID)
+	// Ensure unlock has been applied when eligible.
+	_, _ = s.UnlockEligibleEarnings(ctx, userID)
+
+	rate, _ := s.store.GetExchangeRate(ctx)
+	exchangeRate := 1400.0
+	if rate != nil && rate.USDTNGN > 0 {
+		exchangeRate = rate.USDTNGN
+	}
+
+	// Withdrawable cash lives in wallet available balance (USD), converted to NGN for request amounts.
+	w, err := s.store.GetOrCreateWalletBalances(ctx, userID, InvestorWalletCurrency)
 	if err != nil {
 		return nil, err
 	}
+	availableNGN := w.Available * exchangeRate
 
-	// Check pending withdrawals
+	// Also respect earnings ledger - pending withdrawals reduce free cash
 	pendingWithdrawals, err := s.store.SumPendingWithdrawalsByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	availableBalance := totalEarnings - pendingWithdrawals
+	availableBalance := availableNGN - pendingWithdrawals
+	if availableBalance < 0 {
+		availableBalance = 0
+	}
 	if amount > availableBalance {
 		return nil, errors.ErrInsufficientBalance
 	}
@@ -1434,6 +1722,9 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 		}, nil
 	}
 
+	// Keep wallet locked/available in sync with investments & earnings (idempotent).
+	_ = s.SyncInvestorWallet(ctx, userID)
+
 	investments, _, err := s.store.ListUserInvestments(ctx, userID, "", 1, 500)
 	if err != nil {
 		return nil, err
@@ -1577,21 +1868,55 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 			dash.TotalProfitUSD = totalEarnings / exchangeRate
 		}
 	}
-	dash.PortfolioValueUSD = dash.TotalInvestedUSD + dash.TotalProfitUSD
-	dash.PortfolioValueNGN = dash.TotalInvestedNGN + dash.TotalProfitNGN
-
 	// Explicit portfolio aliases for clients (Bybit-style position view).
 	dash.CapitalInvestedUSD = dash.TotalInvestedUSD
 	dash.CapitalInvestedNGN = dash.TotalInvestedNGN
 	dash.ProfitEarnedUSD = dash.TotalProfitUSD
 	dash.ProfitEarnedNGN = dash.TotalProfitNGN
-	dash.LockedBalanceUSD = lockedUSD
-	dash.LockedBalanceNGN = lockedNGN
-	// Earnings are withdrawable only after referral unlock; capital stays locked.
-	if unlocked {
-		dash.WithdrawableBalanceNGN = dash.AvailableBalanceNGN
+
+	// Wallet Available / Locked from USD investor wallet (source of truth for UI).
+	// Available = unlocked earnings. Locked = capital + still-locked earnings/referrals.
+	dash.ReferralEarningsUSD = 0
+	if exchangeRate > 0 {
+		dash.ReferralEarningsUSD = referralEarnings / exchangeRate
+	}
+
+	walletUSD, werr := s.store.GetOrCreateWalletBalances(ctx, userID, InvestorWalletCurrency)
+	if werr == nil && walletUSD != nil && (walletUSD.Available > 0 || walletUSD.Locked > 0 || walletUSD.Total > 0) {
+		dash.AvailableBalanceUSD = walletUSD.Available
+		dash.LockedBalanceUSD = walletUSD.Locked
+		dash.AvailableBalanceNGN = walletUSD.Available * exchangeRate
+		dash.LockedBalanceNGN = walletUSD.Locked * exchangeRate
+		// Portfolio = available + locked
+		dash.PortfolioValueUSD = walletUSD.Available + walletUSD.Locked
+		dash.PortfolioValueNGN = dash.PortfolioValueUSD * exchangeRate
+		if unlocked {
+			dash.WithdrawableBalanceUSD = walletUSD.Available
+			dash.WithdrawableBalanceNGN = walletUSD.Available * exchangeRate
+		} else {
+			dash.WithdrawableBalanceUSD = 0
+			dash.WithdrawableBalanceNGN = 0
+		}
 	} else {
-		dash.WithdrawableBalanceNGN = 0
+		// Fallback when wallet not yet synced
+		if unlocked {
+			dash.AvailableBalanceUSD = dash.TotalProfitUSD
+			dash.LockedBalanceUSD = lockedUSD
+			dash.WithdrawableBalanceUSD = dash.TotalProfitUSD
+			dash.WithdrawableBalanceNGN = dash.TotalProfitNGN - pendingWithdrawals
+			if dash.WithdrawableBalanceNGN < 0 {
+				dash.WithdrawableBalanceNGN = 0
+			}
+		} else {
+			dash.AvailableBalanceUSD = 0
+			dash.LockedBalanceUSD = lockedUSD + dash.TotalProfitUSD + dash.ReferralEarningsUSD
+			dash.WithdrawableBalanceUSD = 0
+			dash.WithdrawableBalanceNGN = 0
+		}
+		dash.AvailableBalanceNGN = dash.AvailableBalanceUSD * exchangeRate
+		dash.LockedBalanceNGN = dash.LockedBalanceUSD * exchangeRate
+		dash.PortfolioValueUSD = dash.AvailableBalanceUSD + dash.LockedBalanceUSD
+		dash.PortfolioValueNGN = dash.PortfolioValueUSD * exchangeRate
 	}
 	if dash.TotalInvestedUSD > 0 {
 		dash.ROIPercentage = math.Round((dash.TotalProfitUSD/dash.TotalInvestedUSD)*10000) / 100

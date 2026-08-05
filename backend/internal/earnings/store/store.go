@@ -355,82 +355,268 @@ func (s *Store) CountSuccessfulReferrals(ctx context.Context, referrerID string)
 	return n, nil
 }
 
+// WalletBalances is the available/locked view for one currency wallet.
+type WalletBalances struct {
+	ID        string
+	UserID    string
+	Currency  string
+	Available float64
+	Locked    float64
+	Total     float64
+}
+
 // GetOrCreateCurrencyWallet returns the user's wallet for a currency, creating it if needed.
+// Deprecated shape kept for callers that only need id + available.
 func (s *Store) GetOrCreateCurrencyWallet(ctx context.Context, userID, currency string) (walletID string, available, total float64, err error) {
+	w, err := s.GetOrCreateWalletBalances(ctx, userID, currency)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	return w.ID, w.Available, w.Total, nil
+}
+
+// GetOrCreateWalletBalances returns full available/locked/total for a currency wallet.
+func (s *Store) GetOrCreateWalletBalances(ctx context.Context, userID, currency string) (*WalletBalances, error) {
 	currency = strings.ToUpper(strings.TrimSpace(currency))
 	if currency == "" {
-		currency = "NGN"
+		currency = "USD"
 	}
-	err = s.pool.QueryRow(ctx, `
-		SELECT id, available_balance, total_balance FROM wallets
+	w := &WalletBalances{UserID: userID, Currency: currency}
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, available_balance, locked_balance, total_balance FROM wallets
 		WHERE user_id = $1 AND currency = $2 LIMIT 1`, userID, currency,
-	).Scan(&walletID, &available, &total)
+	).Scan(&w.ID, &w.Available, &w.Locked, &w.Total)
 	if err == nil {
-		return walletID, available, total, nil
+		return w, nil
 	}
 	if err != pgx.ErrNoRows {
-		// currency column may not exist on older schemas — try without currency
+		// currency column may not exist — try without
 		err2 := s.pool.QueryRow(ctx, `
-			SELECT id, available_balance, total_balance FROM wallets WHERE user_id = $1 LIMIT 1`, userID,
-		).Scan(&walletID, &available, &total)
+			SELECT id, available_balance, locked_balance, total_balance FROM wallets
+			WHERE user_id = $1 LIMIT 1`, userID,
+		).Scan(&w.ID, &w.Available, &w.Locked, &w.Total)
 		if err2 == nil {
-			return walletID, available, total, nil
+			return w, nil
 		}
 		if err2 != pgx.ErrNoRows {
-			return "", 0, 0, err
+			return nil, err
 		}
 	}
 
-	// Create wallet
 	err = s.pool.QueryRow(ctx, `
 		INSERT INTO wallets (id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at)
 		VALUES (uuid_generate_v4(), $1, $2, 0, 0, 0, 0, NOW())
-		RETURNING id, available_balance, total_balance`, userID, currency,
-	).Scan(&walletID, &available, &total)
+		RETURNING id, available_balance, locked_balance, total_balance`, userID, currency,
+	).Scan(&w.ID, &w.Available, &w.Locked, &w.Total)
 	if err != nil {
-		// Retry without currency column for legacy single-wallet schema
 		err = s.pool.QueryRow(ctx, `
 			INSERT INTO wallets (id, user_id, available_balance, locked_balance, staking_balance, total_balance, updated_at)
 			VALUES (uuid_generate_v4(), $1, 0, 0, 0, 0, NOW())
 			ON CONFLICT DO NOTHING
-			RETURNING id, available_balance, total_balance`, userID,
-		).Scan(&walletID, &available, &total)
+			RETURNING id, available_balance, locked_balance, total_balance`, userID,
+		).Scan(&w.ID, &w.Available, &w.Locked, &w.Total)
 		if err != nil {
-			// Final get
 			err = s.pool.QueryRow(ctx, `
-				SELECT id, available_balance, total_balance FROM wallets WHERE user_id = $1 LIMIT 1`, userID,
-			).Scan(&walletID, &available, &total)
+				SELECT id, available_balance, locked_balance, total_balance FROM wallets
+				WHERE user_id = $1 LIMIT 1`, userID,
+			).Scan(&w.ID, &w.Available, &w.Locked, &w.Total)
 		}
 	}
-	return walletID, available, total, err
+	if err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+// WalletTxExists reports whether a ledger row with this reference already exists (idempotency).
+func (s *Store) WalletTxExists(ctx context.Context, reference string) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM wallet_transactions WHERE reference = $1`, reference,
+	).Scan(&n)
+	if err != nil {
+		// table missing
+		if strings.Contains(err.Error(), "wallet_transactions") || strings.Contains(err.Error(), "does not exist") {
+			return false, nil
+		}
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // CreditWalletAvailable credits available + total balance and records a wallet_transactions row.
+// Idempotent when the same reference already exists.
 func (s *Store) CreditWalletAvailable(ctx context.Context, walletID string, amount float64, txType, reference, description string) error {
-	var before float64
-	err := s.pool.QueryRow(ctx, `SELECT available_balance FROM wallets WHERE id = $1`, walletID).Scan(&before)
+	if amount <= 0 {
+		return nil
+	}
+	if exists, err := s.WalletTxExists(ctx, reference); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+	var beforeAvail float64
+	err := s.pool.QueryRow(ctx, `SELECT available_balance FROM wallets WHERE id = $1`, walletID).Scan(&beforeAvail)
 	if err != nil {
 		return err
 	}
 	_, err = s.pool.Exec(ctx, `
 		UPDATE wallets SET
 			available_balance = available_balance + $2,
-			total_balance = total_balance + $2,
+			total_balance = (available_balance + $2) + locked_balance,
 			updated_at = NOW()
 		WHERE id = $1`, walletID, amount)
 	if err != nil {
 		return err
 	}
+	return s.insertWalletTx(ctx, walletID, txType, amount, beforeAvail, beforeAvail+amount, reference, description)
+}
+
+// CreditWalletLocked credits locked + total balance (investment capital, profit, referral while locked).
+// Idempotent by reference.
+func (s *Store) CreditWalletLocked(ctx context.Context, walletID string, amount float64, txType, reference, description string) error {
+	if amount <= 0 {
+		return nil
+	}
+	if exists, err := s.WalletTxExists(ctx, reference); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+	var beforeLocked float64
+	err := s.pool.QueryRow(ctx, `SELECT locked_balance FROM wallets WHERE id = $1`, walletID).Scan(&beforeLocked)
+	if err != nil {
+		return err
+	}
 	_, err = s.pool.Exec(ctx, `
+		UPDATE wallets SET
+			locked_balance = locked_balance + $2,
+			total_balance = available_balance + (locked_balance + $2),
+			updated_at = NOW()
+		WHERE id = $1`, walletID, amount)
+	if err != nil {
+		return err
+	}
+	return s.insertWalletTx(ctx, walletID, txType, amount, beforeLocked, beforeLocked+amount, reference, description)
+}
+
+// TransferLockedToAvailable moves amount from locked → available (one ledger unlock entry).
+// Idempotent by reference. Does not change total_balance.
+func (s *Store) TransferLockedToAvailable(ctx context.Context, walletID string, amount float64, reference, description string) error {
+	if amount <= 0 {
+		return nil
+	}
+	if exists, err := s.WalletTxExists(ctx, reference); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+	var locked float64
+	err := s.pool.QueryRow(ctx, `SELECT locked_balance FROM wallets WHERE id = $1`, walletID).Scan(&locked)
+	if err != nil {
+		return err
+	}
+	if amount > locked {
+		amount = locked
+	}
+	if amount <= 0 {
+		return nil
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE wallets SET
+			locked_balance = locked_balance - $2,
+			available_balance = available_balance + $2,
+			total_balance = (available_balance + $2) + (locked_balance - $2),
+			updated_at = NOW()
+		WHERE id = $1 AND locked_balance >= $2`, walletID, amount)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("insufficient locked balance for unlock")
+	}
+	return s.insertWalletTx(ctx, walletID, "unlock", amount, locked, locked-amount, reference, description)
+}
+
+func (s *Store) insertWalletTx(ctx context.Context, walletID, txType string, amount, before, after float64, reference, description string) error {
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO wallet_transactions (id, wallet_id, type, amount, balance_before, balance_after, reference, description, created_at)
 		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
-		walletID, txType, amount, before, before+amount, reference, description,
+		walletID, txType, amount, before, after, reference, description,
 	)
-	// wallet_transactions may not exist in all envs — ignore missing table
-	if err != nil && strings.Contains(err.Error(), "wallet_transactions") {
+	if err != nil && (strings.Contains(err.Error(), "wallet_transactions") || strings.Contains(err.Error(), "does not exist")) {
 		return nil
 	}
 	return err
+}
+
+// MoveAvailableToLocked moves amount from available → locked (correct mis-credited available funds).
+// Idempotent by reference.
+func (s *Store) MoveAvailableToLocked(ctx context.Context, walletID string, amount float64, reference, description string) error {
+	if amount <= 0 {
+		return nil
+	}
+	if exists, err := s.WalletTxExists(ctx, reference); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+	var available float64
+	err := s.pool.QueryRow(ctx, `SELECT available_balance FROM wallets WHERE id = $1`, walletID).Scan(&available)
+	if err != nil {
+		return err
+	}
+	if amount > available {
+		amount = available
+	}
+	if amount <= 0 {
+		return nil
+	}
+	_, err = s.pool.Exec(ctx, `
+		UPDATE wallets SET
+			available_balance = available_balance - $2,
+			locked_balance = locked_balance + $2,
+			updated_at = NOW()
+		WHERE id = $1 AND available_balance >= $2`, walletID, amount)
+	if err != nil {
+		return err
+	}
+	_, _ = s.pool.Exec(ctx, `
+		UPDATE wallets SET total_balance = available_balance + locked_balance, updated_at = NOW() WHERE id = $1`, walletID)
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO wallet_transactions (id, wallet_id, type, amount, balance_before, balance_after, reference, description, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
+		walletID, "lock_adjust", amount, available, available-amount, reference, description,
+	)
+	if err != nil && (strings.Contains(err.Error(), "wallet_transactions") || strings.Contains(err.Error(), "does not exist")) {
+		return nil
+	}
+	return err
+}
+
+// SumPlatformWalletBalances returns platform-wide available + locked totals for a currency.
+func (s *Store) SumPlatformWalletBalances(ctx context.Context, currency string) (available, locked, total float64, users int, err error) {
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	err = s.pool.QueryRow(ctx, `
+		SELECT
+			COALESCE(SUM(available_balance), 0),
+			COALESCE(SUM(locked_balance), 0),
+			COALESCE(SUM(total_balance), 0),
+			COUNT(*)
+		FROM wallets WHERE currency = $1`, currency,
+	).Scan(&available, &locked, &total, &users)
+	if err != nil {
+		// fallback without currency filter
+		err = s.pool.QueryRow(ctx, `
+			SELECT
+				COALESCE(SUM(available_balance), 0),
+				COALESCE(SUM(locked_balance), 0),
+				COALESCE(SUM(total_balance), 0),
+				COUNT(*)
+			FROM wallets`,
+		).Scan(&available, &locked, &total, &users)
+	}
+	return
 }
 
 // CreateRewardReturning inserts a reward and returns its generated id.

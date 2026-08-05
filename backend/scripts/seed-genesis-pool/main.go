@@ -78,11 +78,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	out, _ := json.MarshalIndent(summary, "", "  ")
+	// Sync wallets so Available=$0, Locked=$92.50 (capital+profit) until referrals unlock.
+	synced, err := svc.SyncAllInvestorWallets(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "wallet sync warning: %v\n", err)
+	}
+
+	recon, err := svc.PlatformReconciliation(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "reconciliation warning: %v\n", err)
+	}
+
+	out, _ := json.MarshalIndent(map[string]interface{}{
+		"seed":            summary,
+		"wallets_synced":  synced,
+		"reconciliation":  recon,
+	}, "", "  ")
 	fmt.Println(string(out))
 	log.Info("Genesis pool seed complete",
 		zap.Int("credited", summary.InvestorsCredited),
 		zap.Int("skipped", summary.InvestorsSkipped),
 		zap.Float64("total_profit_usd", summary.TotalProfitUSD),
+		zap.Int("wallets_synced", synced),
 	)
 }

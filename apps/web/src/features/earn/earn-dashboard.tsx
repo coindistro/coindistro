@@ -176,12 +176,18 @@ export function EarnDashboard() {
     dashboard?.portfolio_value_usd ?? totalInvestedUsd + totalProfitUsd;
   const portfolioNgn =
     dashboard?.portfolio_value_ngn ?? totalInvestedNgn + totalProfitNgn;
-  const lockedNgn = dashboard?.locked_balance_ngn ?? totalInvestedNgn;
-  const withdrawableNgn = referralsUnlocked
-    ? dashboard?.withdrawable_balance_ngn ?? available
+  const availableUsd = dashboard?.available_balance_usd ?? 0;
+  const lockedUsd =
+    dashboard?.locked_balance_usd ??
+    (referralsUnlocked ? totalInvestedUsd : totalInvestedUsd + totalProfitUsd);
+  const portfolioWalletUsd =
+    dashboard?.portfolio_value_usd ?? availableUsd + lockedUsd;
+  const referralUsd =
+    dashboard?.referral_earnings_usd ??
+    (rate > 0 ? (dashboard?.referral_earnings_ngn ?? 0) / rate : 0);
+  const withdrawableUsd = referralsUnlocked
+    ? dashboard?.withdrawable_balance_usd ?? availableUsd
     : 0;
-  // Available free cash: earnings shown as withdrawable path when unlocked; capital is separate.
-  const freeAvailableNgn = Math.max(0, available - totalProfitNgn);
   const roiPercentage =
     dashboard?.roi_percentage ??
     (totalInvestedUsd > 0 ? (totalProfitUsd / totalInvestedUsd) * 100 : 0);
@@ -460,16 +466,20 @@ export function EarnDashboard() {
         </section>
       )}
 
-      {/* ─── Assets breakdown ─────────────────────────── */}
+      {/* ─── Wallet: Available vs Locked ──────────────── */}
       <PortfolioAssetsCard
-        availableNgn={freeAvailableNgn}
-        lockedInvestmentNgn={lockedNgn}
-        profitEarnedNgn={totalProfitNgn}
-        withdrawableNgn={withdrawableNgn}
+        availableUsd={availableUsd}
+        lockedUsd={lockedUsd}
+        portfolioUsd={portfolioWalletUsd}
+        capitalUsd={totalInvestedUsd}
+        profitUsd={totalProfitUsd}
+        referralUsd={referralUsd}
+        withdrawableUsd={withdrawableUsd}
         withdrawalsUnlocked={referralsUnlocked}
         lockMessage={dashboard?.withdrawal_lock_message}
         minReferrals={minReferrals}
         activeReferrals={activeReferrals}
+        exchangeRate={rate || 1400}
       />
 
       {/* ─── Earnings Summary ─────────────────────────── */}
