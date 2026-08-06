@@ -166,6 +166,21 @@ type InitPaymentRequest struct {
 	Currency       string  `json:"currency" binding:"required,len=3"`
 }
 
+// ─── Payment Init Params (stored on payment transaction before verification) ───
+
+// InvestmentParams is serialized into the payment transaction's Response field
+// at initialization time so that processSuccessfulPayment can create the
+// investment AFTER Paystack/Flutterwave verification succeeds — never before.
+type InvestmentParams struct {
+	PlanID         string  `json:"plan_id"`
+	PlanName       string  `json:"plan_name"`
+	ROIPercent     float64 `json:"roi_percent"`
+	LockPeriodDays int     `json:"lock_period_days"`
+	AllocatedCDT   float64 `json:"allocated_cdt"`
+	ROICDT         float64 `json:"roi_cdt"`
+	CDTPrice       float64 `json:"cdt_price"`
+}
+
 type SetPricingRequest struct {
 	PriceNGN float64 `json:"price_ngn" binding:"required,gt=0"`
 }

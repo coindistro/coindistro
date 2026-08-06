@@ -78,6 +78,9 @@ type EarningsInvestment struct {
 	TotalEarnedNGN    float64          `json:"total_earned_ngn" db:"total_earned_ngn"`
 	TotalPendingNGN   float64          `json:"total_pending_ngn" db:"total_pending_ngn"`
 	Status            InvestmentStatus `json:"status" db:"status"`
+	// IsDemo marks temporary seed/demo investments (safe to purge).
+	IsDemo            bool             `json:"is_demo" db:"is_demo"`
+	PlanName          string           `json:"plan_name,omitempty" db:"-"`
 	MaturityDate      *time.Time       `json:"maturity_date,omitempty" db:"maturity_date"`
 	StartedAt         *time.Time       `json:"started_at,omitempty" db:"started_at"`
 	CompletedAt       *time.Time       `json:"completed_at,omitempty" db:"completed_at"`

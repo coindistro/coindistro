@@ -240,7 +240,24 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 	allocatedCDT := req.Amount / pricing.PriceNGN
 	reference := fmt.Sprintf("CDT-PS-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
 
-	// Create pending payment transaction
+	// Serialize investment params to store on the payment transaction so they
+	// can be used to create the investment AFTER payment verification succeeds.
+	now := time.Now().UTC()
+	roiCDT := allocatedCDT * (plan.ROIPercent / 100.0)
+	params := models.InvestmentParams{
+		PlanID:         plan.ID,
+		PlanName:       plan.Name,
+		ROIPercent:     plan.ROIPercent,
+		LockPeriodDays: req.LockPeriodDays,
+		AllocatedCDT:   allocatedCDT,
+		ROICDT:         roiCDT,
+		CDTPrice:       pricing.PriceNGN,
+	}
+	paramsJSON, _ := json.Marshal(params)
+
+	// Create pending payment transaction (NO investment created yet).
+	// CRITICAL: Investment + wallet credit happen only after Paystack
+	// verifies status == "success" via webhook or VerifyPaystackPayment.
 	pt := &models.PaymentTransaction{
 		ID:        uuidlib.NewString(),
 		UserID:    userID,
@@ -249,7 +266,8 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		Status:    "pending",
 		Amount:    req.Amount,
 		Currency:  req.Currency,
-		CreatedAt: time.Now().UTC(),
+		Response:  paramsJSON,
+		CreatedAt: now,
 	}
 	if err := s.store.CreatePaymentTransaction(ctx, pt); err != nil {
 		return nil, err
@@ -271,38 +289,9 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		return nil, err
 	}
 
-	// Create pending investment record
-	now := time.Now().UTC()
-	maturesAt := now.AddDate(0, 0, req.LockPeriodDays)
-	roiCDT := allocatedCDT * (plan.ROIPercent / 100.0)
-
-	inv := &models.Investment{
-		ID:               uuidlib.NewString(),
-		UserID:           userID,
-		PlanID:           plan.ID,
-		PaymentProvider:  "paystack",
-		PaymentReference: reference,
-		PaymentStatus:    "pending",
-		AmountPaid:       req.Amount,
-		Currency:         req.Currency,
-		ExchangeRate:     1.0,
-		CDTPrice:         pricing.PriceNGN,
-		AllocatedCDT:     allocatedCDT,
-		ROIPercent:       plan.ROIPercent,
-		ROICDT:           roiCDT,
-		LockPeriodDays:   req.LockPeriodDays,
-		Status:           models.InvestmentStatusPending,
-		StartedAt:        nil,
-		MaturesAt:        &maturesAt,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	if err := s.store.CreateInvestment(ctx, inv); err != nil {
-		return nil, err
-	}
-
-	s.audit(ctx, userID, audit.ActionDeposit, "investment", inv.ID, map[string]interface{}{
+	s.audit(ctx, userID, audit.ActionDeposit, "payment_transaction", reference, map[string]interface{}{
 		"provider": "paystack", "reference": reference, "amount": req.Amount,
+		"stage": "initialized", "wallet_credited": false, "investment_created": false,
 	})
 
 	return &models.InitPaymentResponse{
@@ -310,6 +299,72 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		Reference:        reference,
 		AccessCode:       accessCode,
 	}, nil
+}
+
+// VerifyPaystackPayment confirms a checkout after the user returns from Paystack
+// (or if the webhook is delayed). It re-verifies with Paystack's API — never trusts the client.
+// Investment + wallet credit happen only after verified success.
+func (s *Service) VerifyPaystackPayment(ctx context.Context, userID, reference string) (*models.Investment, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return nil, apperrors.ErrBadRequest
+	}
+	if !s.hasStore() {
+		return nil, errors.ErrGatewayNotConfigured
+	}
+	if s.cfg.PaystackSecretKey == "" {
+		return nil, errors.ErrGatewayNotConfigured
+	}
+
+	// Already activated (webhook may have won the race)?
+	if inv, err := s.store.GetInvestmentByReference(ctx, "paystack", reference); err == nil && inv != nil {
+		if inv.UserID != userID {
+			return nil, errors.ErrInvestmentNotFound
+		}
+		if inv.Status == models.InvestmentStatusActive || inv.PaymentStatus == "completed" {
+			s.logger.Info("Paystack payment already verified",
+				zap.String("reference", reference),
+				zap.String("investment_id", inv.ID),
+			)
+			return inv, nil
+		}
+	}
+
+	// Must have a pending payment intent from init (no investment yet is OK).
+	pt, err := s.store.GetPaymentTransactionByReference(ctx, "paystack", reference)
+	if err != nil {
+		return nil, err
+	}
+	if pt == nil || pt.UserID != userID {
+		return nil, errors.ErrPaymentVerificationFailed
+	}
+
+	// Verify with Paystack API — never trust the client's claim of success.
+	verified, err := s.verifyPaystackTransaction(ctx, reference)
+	if err != nil {
+		return nil, err
+	}
+	if !verified {
+		s.logger.Info("Paystack verification not successful — no investment/wallet credit",
+			zap.String("reference", reference),
+			zap.String("user_id", userID),
+		)
+		return nil, errors.ErrPaymentVerificationFailed
+	}
+
+	s.logger.Info("Paystack verification succeeded",
+		zap.String("reference", reference),
+		zap.String("user_id", userID),
+	)
+
+	if err := s.processSuccessfulPayment(ctx, "paystack", reference, pt.Amount, pt.Currency); err != nil {
+		if err == errors.ErrPaymentAlreadyProcessed {
+			return s.store.GetInvestmentByReference(ctx, "paystack", reference)
+		}
+		return nil, err
+	}
+
+	return s.store.GetInvestmentByReference(ctx, "paystack", reference)
 }
 
 func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req *models.InitPaymentRequest) (*models.InitPaymentResponse, error) {
@@ -329,7 +384,24 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 	allocatedCDT := req.Amount / pricing.PriceNGN
 	reference := fmt.Sprintf("CDT-FW-%s-%d", uuidlib.NewString()[:8], time.Now().Unix())
 
-	// Create pending payment transaction
+	// Serialize investment params to store on the payment transaction so they
+	// can be used to create the investment AFTER payment verification succeeds.
+	now := time.Now().UTC()
+	roiCDT := allocatedCDT * (plan.ROIPercent / 100.0)
+	params := models.InvestmentParams{
+		PlanID:         plan.ID,
+		PlanName:       plan.Name,
+		ROIPercent:     plan.ROIPercent,
+		LockPeriodDays: req.LockPeriodDays,
+		AllocatedCDT:   allocatedCDT,
+		ROICDT:         roiCDT,
+		CDTPrice:       pricing.PriceNGN,
+	}
+	paramsJSON, _ := json.Marshal(params)
+
+	// Create pending payment transaction (NO investment created yet).
+	// CRITICAL: Investment + wallet credit happen only after Flutterwave
+	// verifies status == "successful" via webhook.
 	pt := &models.PaymentTransaction{
 		ID:        uuidlib.NewString(),
 		UserID:    userID,
@@ -338,7 +410,8 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 		Status:    "pending",
 		Amount:    req.Amount,
 		Currency:  req.Currency,
-		CreatedAt: time.Now().UTC(),
+		Response:  paramsJSON,
+		CreatedAt: now,
 	}
 	if err := s.store.CreatePaymentTransaction(ctx, pt); err != nil {
 		return nil, err
@@ -350,38 +423,9 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 		return nil, err
 	}
 
-	// Create pending investment record
-	now := time.Now().UTC()
-	maturesAt := now.AddDate(0, 0, req.LockPeriodDays)
-	roiCDT := allocatedCDT * (plan.ROIPercent / 100.0)
-
-	inv := &models.Investment{
-		ID:               uuidlib.NewString(),
-		UserID:           userID,
-		PlanID:           plan.ID,
-		PaymentProvider:  "flutterwave",
-		PaymentReference: reference,
-		PaymentStatus:    "pending",
-		AmountPaid:       req.Amount,
-		Currency:         req.Currency,
-		ExchangeRate:     1.0,
-		CDTPrice:         pricing.PriceNGN,
-		AllocatedCDT:     allocatedCDT,
-		ROIPercent:       plan.ROIPercent,
-		ROICDT:           roiCDT,
-		LockPeriodDays:   req.LockPeriodDays,
-		Status:           models.InvestmentStatusPending,
-		StartedAt:        nil,
-		MaturesAt:        &maturesAt,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	if err := s.store.CreateInvestment(ctx, inv); err != nil {
-		return nil, err
-	}
-
-	s.audit(ctx, userID, audit.ActionDeposit, "investment", inv.ID, map[string]interface{}{
+	s.audit(ctx, userID, audit.ActionDeposit, "payment_transaction", reference, map[string]interface{}{
 		"provider": "flutterwave", "reference": reference, "amount": req.Amount,
+		"stage": "initialized", "wallet_credited": false, "investment_created": false,
 	})
 
 	return &models.InitPaymentResponse{
@@ -501,7 +545,7 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 		return errors.ErrPaymentVerificationFailed
 	}
 
-	// Process the investment
+	// Process the investment — amount from Paystack is in kobo
 	if err := s.processSuccessfulPayment(ctx, "paystack", reference, event.Data.Amount/100, event.Data.Currency); err != nil {
 		return err
 	}
@@ -579,34 +623,44 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 	return s.store.MarkWebhookProcessed(ctx, "flutterwave", eventID)
 }
 
+// ─── Payment Success Processing ───────────────────────────
+
+// processSuccessfulPayment runs ONLY after Paystack/Flutterwave verification succeeds.
+// It creates the investment (if not already present), activates it, credits wallet,
+// and records transaction history. Cancelled/abandoned/failed payments never
+// reach this path.
 func (s *Service) processSuccessfulPayment(ctx context.Context, provider, reference string, amountPaid float64, currency string) error {
-	s.logger.Info("payment verified",
+	s.logger.Info("payment verified — creating investment and crediting wallet",
 		zap.String("provider", provider),
 		zap.String("reference", reference),
 		zap.Float64("amount", amountPaid),
 		zap.String("currency", currency),
 	)
 
-	// Get the pending investment
-	inv, err := s.store.GetInvestmentByReference(ctx, provider, reference)
+	// Look up the payment transaction created at init time.
+	pt, err := s.store.GetPaymentTransactionByReference(ctx, provider, reference)
 	if err != nil {
 		return err
 	}
-	if inv == nil {
-		return errors.ErrInvestmentNotFound
+	if pt == nil {
+		return errors.ErrPaymentVerificationFailed
 	}
 
-	// Prevent duplicate processing
-	if inv.Status != models.InvestmentStatusPending {
-		return errors.ErrPaymentAlreadyProcessed
+	// Idempotency: if already completed and investment exists, skip.
+	if pt.Status == "completed" {
+		if inv, _ := s.store.GetInvestmentByReference(ctx, provider, reference); inv != nil {
+			if inv.Status != models.InvestmentStatusPending {
+				return errors.ErrPaymentAlreadyProcessed
+			}
+		}
 	}
 
-	// Verify payment amount matches (allow small difference for gateway fees)
-	diff := math.Abs(inv.AmountPaid - amountPaid)
-	if diff > 100 { // Allow up to 100 currency units difference
+	// Verify payment amount matches (allow for gateway fees).
+	diff := math.Abs(pt.Amount - amountPaid)
+	if amountPaid > 0 && diff > 100 {
 		s.logger.Warn("payment amount mismatch",
 			zap.String("reference", reference),
-			zap.Float64("expected", inv.AmountPaid),
+			zap.Float64("expected", pt.Amount),
 			zap.Float64("received", amountPaid),
 		)
 		return errors.ErrPaymentVerificationFailed
@@ -614,27 +668,70 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 
 	now := time.Now().UTC()
 
-	// Update payment transaction
-	pt, err := s.store.GetPaymentTransactionByReference(ctx, provider, reference)
-	if err == nil && pt != nil {
-		_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
-	}
-
-	// Update investment to active
-	inv.PaymentStatus = "completed"
-	inv.Status = models.InvestmentStatusActive
-	inv.StartedAt = &now
-
-	// Recalculate matures_at from now
-	maturesAt := now.AddDate(0, 0, inv.LockPeriodDays)
-	inv.MaturesAt = &maturesAt
-	inv.UpdatedAt = now
-
-	if err := s.store.UpdateInvestment(ctx, inv); err != nil {
+	// Check if investment already exists (e.g. webhook and verify both fired).
+	inv, err := s.store.GetInvestmentByReference(ctx, provider, reference)
+	if err != nil {
 		return err
 	}
 
-	// Get or create CDT wallet (investments are denominated in CDT)
+	if inv == nil {
+		// Deferred investment creation — only now, after verified success.
+		// Parse the params stored on the payment transaction at init time.
+		params := models.InvestmentParams{}
+		if len(pt.Response) > 0 {
+			_ = json.Unmarshal(pt.Response, &params)
+		}
+
+		maturesAt := now.AddDate(0, 0, params.LockPeriodDays)
+		inv = &models.Investment{
+			ID:               uuidlib.NewString(),
+			UserID:           pt.UserID,
+			PlanID:           params.PlanID,
+			PaymentProvider:  provider,
+			PaymentReference: reference,
+			PaymentStatus:    "completed",
+			AmountPaid:       pt.Amount,
+			Currency:         pt.Currency,
+			ExchangeRate:     1.0,
+			CDTPrice:         params.CDTPrice,
+			AllocatedCDT:     params.AllocatedCDT,
+			ROIPercent:       params.ROIPercent,
+			ROICDT:           params.ROICDT,
+			LockPeriodDays:   params.LockPeriodDays,
+			Status:           models.InvestmentStatusActive,
+			StartedAt:        &now,
+			MaturesAt:        &maturesAt,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		if err := s.store.CreateInvestment(ctx, inv); err != nil {
+			return err
+		}
+		s.logger.Info("Investment created after verified payment",
+			zap.String("investment_id", inv.ID),
+			zap.String("reference", reference),
+		)
+	} else {
+		// Investment already exists (e.g. created by an earlier code path).
+		// Activate it.
+		if inv.Status != models.InvestmentStatusPending {
+			return errors.ErrPaymentAlreadyProcessed
+		}
+		inv.PaymentStatus = "completed"
+		inv.Status = models.InvestmentStatusActive
+		inv.StartedAt = &now
+		maturesAt := now.AddDate(0, 0, inv.LockPeriodDays)
+		inv.MaturesAt = &maturesAt
+		inv.UpdatedAt = now
+		if err := s.store.UpdateInvestment(ctx, inv); err != nil {
+			return err
+		}
+	}
+
+	// Mark payment transaction completed.
+	_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
+
+	// Get or create CDT wallet (investments are denominated in CDT).
 	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID, "CDT")
 	if err != nil {
 		return err
@@ -647,12 +744,16 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		zap.String("type", "locked"),
 	)
 
-	// Credit locked CDT to wallet
+	// Credit locked CDT to wallet.
 	if err := s.store.CreditWalletLocked(ctx, wallet.ID, inv.AllocatedCDT); err != nil {
 		return err
 	}
 
-	// Record wallet transaction
+	// Record wallet transaction.
+	planName := inv.PlanID
+	if inv.Plan != nil && inv.Plan.Name != "" {
+		planName = inv.Plan.Name
+	}
 	wt := &models.WalletTransaction{
 		ID:            uuidlib.NewString(),
 		WalletID:      wallet.ID,
@@ -661,12 +762,17 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		BalanceBefore: wallet.TotalBalance,
 		BalanceAfter:  wallet.TotalBalance + inv.AllocatedCDT,
 		Reference:     reference,
-		Description:   fmt.Sprintf("Investment in %s plan - %d CDT locked until %s", inv.Plan.Name, int(inv.AllocatedCDT), inv.MaturesAt.Format("2006-01-02")),
-		CreatedAt:     now,
+		Description: fmt.Sprintf("Investment in %s plan - %d CDT locked until %s", planName, int(inv.AllocatedCDT), func() string {
+			if inv.MaturesAt != nil {
+				return inv.MaturesAt.Format("2006-01-02")
+			}
+			return ""
+		}()),
+		CreatedAt: now,
 	}
 	_ = s.store.CreateWalletTransaction(ctx, wt)
 
-	// Publish events
+	// Publish events.
 	s.publish(events.EventDepositCompleted, map[string]interface{}{
 		"user_id":       inv.UserID,
 		"investment_id": inv.ID,

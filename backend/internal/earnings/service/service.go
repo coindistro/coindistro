@@ -289,6 +289,9 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 	}
 
 	// Call Paystack initialize API (secret key from PAYSTACK_SECRET_KEY only).
+	// CRITICAL: Do NOT create investment or credit wallet here — only after
+	// webhook/verify reports Paystack status == "success".
+	_ = settings // validated above; amounts stored on payment transaction
 	authURL, accessCode, err := s.callPaystackInitialize(ctx, amountNGN, req.Currency, reference, userID, email)
 	if err != nil {
 		s.logger.Error("Paystack initialize API failed",
@@ -298,38 +301,13 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 		return nil, err
 	}
 
-	// Create pending investment record
-	now := time.Now().UTC()
-	totalPending := float64(settings.MaxBusinessDays) * settings.DailyRewardNGN
-	inv := &models.EarningsInvestment{
-		ID:               uuidlib.NewString(),
-		UserID:           userID,
-		AmountUSD:        req.AmountUSD,
-		AmountNGN:        amountNGN,
-		ExchangeRate:     rate.USDTNGN,
-		PaymentProvider:  "paystack",
-		PaymentReference: reference,
-		PaymentStatus:    "pending",
-		DailyRewardNGN:   settings.DailyRewardNGN,
-		MaxBusinessDays:  settings.MaxBusinessDays,
-		PaidBusinessDays: 0,
-		TotalEarnedNGN:   0,
-		TotalPendingNGN:  totalPending,
-		Status:           models.InvestmentStatusPendingPayment,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	if err := s.store.CreateInvestment(ctx, inv); err != nil {
-		return nil, err
-	}
-
-	s.audit(ctx, userID, audit.ActionDeposit, "earnings_investment", inv.ID, map[string]interface{}{
+	s.audit(ctx, userID, audit.ActionDeposit, "payment_transaction", reference, map[string]interface{}{
 		"provider": "paystack", "reference": reference, "amount_usd": req.AmountUSD,
+		"stage": "initialized", "wallet_credited": false, "investment_created": false,
 	})
 
-	s.logger.Info("Paystack checkout ready",
+	s.logger.Info("Paystack checkout ready (no investment until payment success)",
 		zap.String("reference", reference),
-		zap.String("investment_id", inv.ID),
 		zap.String("customer_email", email),
 		zap.Float64("amount_ngn", amountNGN),
 		zap.String("callback_url", s.paystackCallbackURL()),
@@ -344,6 +322,7 @@ func (s *Service) InitPaystackPayment(ctx context.Context, userID string, req *m
 
 // VerifyPaystackPayment confirms a checkout after the user returns from Paystack
 // (or if the webhook is delayed). It re-verifies with Paystack's API — never trusts the client.
+// Investment + wallet credit happen only after verified success.
 func (s *Service) VerifyPaystackPayment(ctx context.Context, userID, reference string) (*models.EarningsInvestment, error) {
 	reference = strings.TrimSpace(reference)
 	if reference == "" {
@@ -356,22 +335,27 @@ func (s *Service) VerifyPaystackPayment(ctx context.Context, userID, reference s
 		return nil, errors.ErrGatewayNotConfigured
 	}
 
-	inv, err := s.store.GetInvestmentByReference(ctx, "paystack", reference)
+	// Already activated?
+	if inv, err := s.store.GetInvestmentByReference(ctx, "paystack", reference); err == nil && inv != nil {
+		if inv.UserID != userID {
+			return nil, errors.ErrInvestmentNotFound
+		}
+		if inv.Status == models.InvestmentStatusActive || inv.PaymentStatus == "completed" {
+			s.logger.Info("Paystack payment already verified",
+				zap.String("reference", reference),
+				zap.String("investment_id", inv.ID),
+			)
+			return inv, nil
+		}
+	}
+
+	// Must have a pending payment intent from init (no investment yet is OK).
+	pt, err := s.store.GetPaymentTransactionByReference(ctx, "paystack", reference)
 	if err != nil {
 		return nil, err
 	}
-	if inv == nil || inv.UserID != userID {
-		return nil, errors.ErrInvestmentNotFound
-	}
-
-	// Already activated (webhook may have won the race).
-	if inv.Status == models.InvestmentStatusActive || inv.PaymentStatus == "completed" {
-		s.logger.Info("Paystack payment already verified",
-			zap.String("reference", reference),
-			zap.String("investment_id", inv.ID),
-			zap.String("status", string(inv.Status)),
-		)
-		return inv, nil
+	if pt == nil || pt.UserID != userID {
+		return nil, errors.ErrPaymentVerificationFailed
 	}
 
 	verified, err := s.verifyPaystackTransaction(ctx, reference)
@@ -379,15 +363,19 @@ func (s *Service) VerifyPaystackPayment(ctx context.Context, userID, reference s
 		return nil, err
 	}
 	if !verified {
+		s.logger.Info("Paystack verification not successful — no investment/wallet credit",
+			zap.String("reference", reference),
+			zap.String("user_id", userID),
+		)
 		return nil, errors.ErrPaymentVerificationFailed
 	}
 
 	s.logger.Info("Verification succeeded",
 		zap.String("reference", reference),
-		zap.String("investment_id", inv.ID),
+		zap.String("user_id", userID),
 	)
 
-	if err := s.processSuccessfulPayment(ctx, "paystack", reference, inv.AmountNGN, "NGN"); err != nil {
+	if err := s.processSuccessfulPayment(ctx, "paystack", reference, pt.AmountNGN, "NGN"); err != nil {
 		if err == errors.ErrPaymentAlreadyProcessed {
 			return s.store.GetInvestmentByReference(ctx, "paystack", reference)
 		}
@@ -439,39 +427,16 @@ func (s *Service) InitFlutterwavePayment(ctx context.Context, userID string, req
 		return nil, errors.ErrEmailRequired
 	}
 
-	// Call Flutterwave initialize API
+	// Call Flutterwave initialize API — no investment/wallet credit until success.
+	_ = settings
 	authURL, err := s.callFlutterwaveInitialize(ctx, amountNGN, req.Currency, reference, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create pending investment record
-	now := time.Now().UTC()
-	totalPending := float64(settings.MaxBusinessDays) * settings.DailyRewardNGN
-	inv := &models.EarningsInvestment{
-		ID:               uuidlib.NewString(),
-		UserID:           userID,
-		AmountUSD:        req.AmountUSD,
-		AmountNGN:        amountNGN,
-		ExchangeRate:     rate.USDTNGN,
-		PaymentProvider:  "flutterwave",
-		PaymentReference: reference,
-		PaymentStatus:    "pending",
-		DailyRewardNGN:   settings.DailyRewardNGN,
-		MaxBusinessDays:  settings.MaxBusinessDays,
-		PaidBusinessDays: 0,
-		TotalEarnedNGN:   0,
-		TotalPendingNGN:  totalPending,
-		Status:           models.InvestmentStatusPendingPayment,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	if err := s.store.CreateInvestment(ctx, inv); err != nil {
-		return nil, err
-	}
-
-	s.audit(ctx, userID, audit.ActionDeposit, "earnings_investment", inv.ID, map[string]interface{}{
+	s.audit(ctx, userID, audit.ActionDeposit, "payment_transaction", reference, map[string]interface{}{
 		"provider": "flutterwave", "reference": reference, "amount_usd": req.AmountUSD,
+		"stage": "initialized", "wallet_credited": false, "investment_created": false,
 	})
 
 	return &models.InitEarningsPaymentResponse{
@@ -673,58 +638,112 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 	return nil
 }
 
+// processSuccessfulPayment runs ONLY after Paystack/Flutterwave verification succeeds.
+// It creates the investment (if not already present), activates it, credits wallet, and audits.
+// Cancelled/abandoned/failed payments never reach this path.
 func (s *Service) processSuccessfulPayment(ctx context.Context, provider, reference string, amountPaid float64, currency string) error {
-	s.logger.Info("payment verified",
+	s.logger.Info("payment verified — creating investment and crediting wallet",
 		zap.String("provider", provider),
 		zap.String("reference", reference),
 		zap.Float64("amount", amountPaid),
 		zap.String("currency", currency),
 	)
 
-	inv, err := s.store.GetInvestmentByReference(ctx, provider, reference)
+	pt, err := s.store.GetPaymentTransactionByReference(ctx, provider, reference)
 	if err != nil {
 		return err
 	}
-	if inv == nil {
-		return errors.ErrInvestmentNotFound
+	if pt == nil {
+		return errors.ErrPaymentVerificationFailed
+	}
+	if pt.Status == "completed" {
+		// Idempotent: already processed
+		if inv, _ := s.store.GetInvestmentByReference(ctx, provider, reference); inv != nil {
+			return errors.ErrPaymentAlreadyProcessed
+		}
 	}
 
-	if inv.Status != models.InvestmentStatusPendingPayment {
-		return errors.ErrPaymentAlreadyProcessed
-	}
-
-	// Verify payment amount (allow for gateway fees)
-	diff := math.Abs(inv.AmountNGN - amountPaid)
-	if diff > 100 {
+	// Amount check against payment intent
+	diff := math.Abs(pt.AmountNGN - amountPaid)
+	if amountPaid > 0 && diff > 100 {
 		s.logger.Warn("payment amount mismatch",
 			zap.String("reference", reference),
-			zap.Float64("expected", inv.AmountNGN),
+			zap.Float64("expected", pt.AmountNGN),
 			zap.Float64("received", amountPaid),
 		)
 		return errors.ErrPaymentVerificationFailed
 	}
 
 	now := time.Now().UTC()
-
-	// Calculate maturity date (20 business days from now)
-	maturityDate := s.calculateMaturityDate(now, inv.MaxBusinessDays)
-
-	// Update payment transaction
-	pt, err := s.store.GetPaymentTransactionByReference(ctx, provider, reference)
-	if err == nil && pt != nil {
-		_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
+	settings, _ := s.store.GetSettings(ctx)
+	if settings == nil {
+		settings = defaultInvestmentSettings()
 	}
 
-	// Update investment to active — ROI schedule starts from StartedAt / maturity.
-	inv.PaymentStatus = "completed"
-	inv.Status = models.InvestmentStatusActive
-	inv.StartedAt = &now
-	inv.MaturityDate = &maturityDate
-	inv.UpdatedAt = now
-
-	if err := s.store.UpdateInvestment(ctx, inv); err != nil {
+	inv, err := s.store.GetInvestmentByReference(ctx, provider, reference)
+	if err != nil {
 		return err
 	}
+
+	// Create investment only after verified success (deferred from init).
+	if inv == nil {
+		totalPending := float64(settings.MaxBusinessDays) * settings.DailyRewardNGN
+		// Prefer ROI-derived daily reward when ROI is set
+		daily := settings.DailyRewardNGN
+		if settings.ROIPercent > 0 && settings.MaxBusinessDays > 0 {
+			daily = (pt.AmountNGN * (settings.ROIPercent / 100.0)) / float64(settings.MaxBusinessDays)
+			totalPending = daily * float64(settings.MaxBusinessDays)
+		}
+		maturityDate := s.calculateMaturityDate(now, settings.MaxBusinessDays)
+		inv = &models.EarningsInvestment{
+			ID:               uuidlib.NewString(),
+			UserID:           pt.UserID,
+			AmountUSD:        pt.AmountUSD,
+			AmountNGN:        pt.AmountNGN,
+			ExchangeRate:     pt.ExchangeRate,
+			PaymentProvider:  provider,
+			PaymentReference: reference,
+			PaymentStatus:    "completed",
+			DailyRewardNGN:   daily,
+			MaxBusinessDays:  settings.MaxBusinessDays,
+			PaidBusinessDays: 0,
+			TotalEarnedNGN:   0,
+			TotalPendingNGN:  totalPending,
+			Status:           models.InvestmentStatusActive,
+			IsDemo:           false,
+			MaturityDate:     &maturityDate,
+			StartedAt:        &now,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		if err := s.store.CreateInvestment(ctx, inv); err != nil {
+			return err
+		}
+		s.logger.Info("Investment created after verified payment",
+			zap.String("investment_id", inv.ID),
+			zap.String("reference", reference),
+		)
+	} else {
+		if inv.Status != models.InvestmentStatusPendingPayment && inv.PaymentStatus == "completed" {
+			return errors.ErrPaymentAlreadyProcessed
+		}
+		if inv.IsDemo {
+			// Never promote demo via payment path
+			return errors.ErrPaymentAlreadyProcessed
+		}
+		maturityDate := s.calculateMaturityDate(now, inv.MaxBusinessDays)
+		inv.PaymentStatus = "completed"
+		inv.Status = models.InvestmentStatusActive
+		inv.StartedAt = &now
+		inv.MaturityDate = &maturityDate
+		inv.UpdatedAt = now
+		if err := s.store.UpdateInvestment(ctx, inv); err != nil {
+			return err
+		}
+	}
+
+	// Mark payment transaction completed
+	_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
 
 	// Lock investment capital in the investor USD wallet (idempotent).
 	if err := s.creditLockedWallet(ctx, inv.UserID, inv.AmountUSD, "investment",
@@ -747,6 +766,7 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 
 	s.audit(ctx, inv.UserID, audit.ActionDeposit, "earnings_investment", inv.ID, map[string]interface{}{
 		"provider": provider, "reference": reference, "amount_usd": inv.AmountUSD,
+		"stage": "completed", "wallet_credited": true, "investment_created": true,
 	})
 
 	s.logger.Info("Investment activated",
@@ -755,7 +775,6 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		zap.String("provider", provider),
 		zap.String("reference", reference),
 		zap.Float64("amount_usd", inv.AmountUSD),
-		zap.Time("maturity_date", maturityDate),
 	)
 	s.logger.Info("ROI schedule started",
 		zap.String("investment_id", inv.ID),
@@ -1124,14 +1143,14 @@ func (s *Service) PlatformReconciliation(ctx context.Context) (map[string]interf
 		}
 	}
 	return map[string]interface{}{
-		"currency":                     InvestorWalletCurrency,
-		"total_available_balance":      avail,
-		"total_locked_balance":         locked,
-		"total_portfolio_value":        total,
-		"wallet_rows":                  users,
+		"currency":                      InvestorWalletCurrency,
+		"total_available_balance":       avail,
+		"total_locked_balance":          locked,
+		"total_portfolio_value":         total,
+		"wallet_rows":                   users,
 		"users_with_locked_withdrawals": lockedUsers,
-		"users_eligible_to_withdraw":   eligibleUsers,
-		"min_referrals_required":       minRefs,
+		"users_eligible_to_withdraw":    eligibleUsers,
+		"min_referrals_required":        minRefs,
 	}, nil
 }
 
@@ -1769,20 +1788,20 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (*models.Earn
 	}
 
 	dash := &models.EarningsDashboard{
-		TotalInvestedUSD:       0,
-		TotalInvestedNGN:       0,
-		ExchangeRate:           exchangeRate,
-		TodayEarningsNGN:       todayEarnings,
-		MonthlyEarningsNGN:     monthlyEarnings,
-		AvailableBalanceNGN:    totalEarnings - pendingWithdrawals,
-		PendingWithdrawalNGN:   pendingWithdrawals,
-		ReferralEarningsNGN:    referralEarnings,
-		LastWithdrawalAt:       lastWithdrawalAt,
-		WithdrawalsUnlocked:    unlocked,
-		WithdrawalLockMessage:  lockMsg,
-		ActiveReferrals:        successfulRefs,
-		MinReferralsRequired:   minRefs,
-		RemainingReferrals:     remainingRefs,
+		TotalInvestedUSD:      0,
+		TotalInvestedNGN:      0,
+		ExchangeRate:          exchangeRate,
+		TodayEarningsNGN:      todayEarnings,
+		MonthlyEarningsNGN:    monthlyEarnings,
+		AvailableBalanceNGN:   totalEarnings - pendingWithdrawals,
+		PendingWithdrawalNGN:  pendingWithdrawals,
+		ReferralEarningsNGN:   referralEarnings,
+		LastWithdrawalAt:      lastWithdrawalAt,
+		WithdrawalsUnlocked:   unlocked,
+		WithdrawalLockMessage: lockMsg,
+		ActiveReferrals:       successfulRefs,
+		MinReferralsRequired:  minRefs,
+		RemainingReferrals:    remainingRefs,
 	}
 
 	var summaries []*models.EarningsSummary
@@ -2089,6 +2108,108 @@ func (s *Service) AdminListWithdrawals(ctx context.Context, status string, page,
 
 func (s *Service) AdminListInvestments(ctx context.Context, status string, page, perPage int) ([]*models.EarningsInvestment, int, error) {
 	return s.store.ListUserInvestments(ctx, "", status, page, perPage)
+}
+
+// ─── Demo Seeding (development only) ─────────────────────
+
+// SeedDemoInvestments creates a demo Genesis investment for every active user
+// that has no real (non-demo) investment yet. It is idempotent: running it
+// multiple times never duplicates investments or wallet balances.
+//
+// Demo plan: $30 capital, 19% ROI, 20 business days, 10% referral bonus.
+// All demo records are flagged is_demo = true so they can be purged later.
+func (s *Service) SeedDemoInvestments(ctx context.Context) (int, error) {
+	if !s.hasStore() {
+		return 0, nil
+	}
+
+	const (
+		demoAmountUSD   = 30.0
+		demoROIPercent  = 19.0
+		demoWorkingDays = 20
+	)
+
+	userIDs, err := s.store.ListIdentityUserIDs(ctx, 10000)
+	if err != nil {
+		return 0, err
+	}
+
+	seeded := 0
+	for _, userID := range userIDs {
+		// Skip users who already have a real investment or a demo investment.
+		hasReal, err := s.store.UserHasRealInvestment(ctx, userID)
+		if err != nil {
+			return seeded, err
+		}
+		if hasReal {
+			continue
+		}
+		hasDemo, err := s.store.UserHasDemoInvestment(ctx, userID)
+		if err != nil {
+			return seeded, err
+		}
+		if hasDemo {
+			continue
+		}
+
+		// Exchange rate for NGN display.
+		rate := 1400.0
+		if r, err := s.store.GetExchangeRate(ctx); err == nil && r != nil {
+			rate = r.USDTNGN
+		}
+
+		amountNGN := demoAmountUSD * rate
+		dailyReward := (amountNGN * (demoROIPercent / 100.0)) / demoWorkingDays
+		totalPending := dailyReward * demoWorkingDays
+
+		now := time.Now().UTC()
+		maturityDate := s.calculateMaturityDate(now, demoWorkingDays)
+
+		inv := &models.EarningsInvestment{
+			ID:               uuidlib.NewString(),
+			UserID:           userID,
+			AmountUSD:        demoAmountUSD,
+			AmountNGN:        amountNGN,
+			ExchangeRate:     rate,
+			PaymentProvider:  "demo",
+			PaymentReference: fmt.Sprintf("DEMO-GENESIS-%s", uuidlib.NewString()[:8]),
+			PaymentStatus:    "completed",
+			DailyRewardNGN:   dailyReward,
+			MaxBusinessDays:  demoWorkingDays,
+			PaidBusinessDays: 0,
+			TotalEarnedNGN:   0,
+			TotalPendingNGN:  totalPending,
+			Status:           models.InvestmentStatusActive,
+			IsDemo:           true,
+			PlanName:         "Seed Plan",
+			MaturityDate:     &maturityDate,
+			StartedAt:        &now,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		if err := s.store.CreateInvestment(ctx, inv); err != nil {
+			return seeded, err
+		}
+
+		// Credit the user's USD wallet with the demo available balance ($30).
+		wallet, err := s.store.GetOrCreateWalletBalances(ctx, userID, "USD")
+		if err != nil {
+			return seeded, err
+		}
+		if err := s.store.CreditWalletAvailable(ctx, wallet.ID, demoAmountUSD, "demo_seed",
+			fmt.Sprintf("DEMO-SEED-%s", inv.ID),
+			fmt.Sprintf("Demo Genesis seed balance $%.2f", demoAmountUSD)); err != nil {
+			return seeded, err
+		}
+
+		seeded++
+	}
+
+	s.logger.Info("demo investments seeded",
+		zap.Int("seeded", seeded),
+		zap.Int("users_checked", len(userIDs)),
+	)
+	return seeded, nil
 }
 
 // ─── Helpers ─────────────────────────────────────────────

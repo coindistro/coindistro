@@ -111,6 +111,38 @@ func (h *Handlers) InitFlutterwavePayment(c *gin.Context) {
 	response.OK(c, "Payment initialized", resp)
 }
 
+// VerifyPaystackPayment godoc
+// @Summary Verify Paystack payment after redirect
+// @Tags Investments
+// @Security BearerAuth
+// @Produce json
+// @Param reference query string true "Paystack transaction reference"
+// @Success 200 {object} response.APIResponse{data=models.Investment}
+// @Router /payments/paystack/verify [get]
+func (h *Handlers) VerifyPaystackPayment(c *gin.Context) {
+	reference := c.Query("reference")
+	if reference == "" {
+		reference = c.Query("trxref")
+	}
+	if reference == "" {
+		var body struct {
+			Reference string `json:"reference"`
+		}
+		_ = c.ShouldBindJSON(&body)
+		reference = body.Reference
+	}
+	inv, err := h.svc.VerifyPaystackPayment(c.Request.Context(), c.GetString("user_id"), reference)
+	if err != nil {
+		h.logger.Error("paystack verify failed",
+			zap.String("reference", reference),
+			zap.Error(err),
+		)
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, "Payment verified", inv)
+}
+
 // ─── Webhooks ─────────────────────────────────────────
 
 // PaystackWebhook godoc
@@ -500,6 +532,9 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handlers, authMiddleware gin.Handler
 		authed.POST("/payments/flutterwave/init", h.InitFlutterwavePayment)
 		authed.POST("/payments/paystack/initiate", h.InitPaystackPayment)
 		authed.POST("/payments/flutterwave/initiate", h.InitFlutterwavePayment)
+		// Payment verification (after redirect from gateway)
+		authed.GET("/payments/paystack/verify", h.VerifyPaystackPayment)
+		authed.POST("/payments/paystack/verify", h.VerifyPaystackPayment)
 
 		// Investment dashboard
 		authed.GET("/earn/investments", h.GetDashboard)

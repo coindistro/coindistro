@@ -174,14 +174,14 @@ func (s *Store) CreateInvestment(ctx context.Context, inv *models.EarningsInvest
 			id, user_id, amount_usd, amount_ngn, exchange_rate,
 			payment_provider, payment_reference, payment_status,
 			daily_reward_ngn, max_business_days, paid_business_days,
-			total_earned_ngn, total_pending_ngn, status,
+			total_earned_ngn, total_pending_ngn, status, is_demo,
 			maturity_date, started_at, completed_at, paused_at, cancelled_at,
 			early_withdrawal_at, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
 		inv.ID, inv.UserID, inv.AmountUSD, inv.AmountNGN, inv.ExchangeRate,
 		inv.PaymentProvider, inv.PaymentReference, inv.PaymentStatus,
 		inv.DailyRewardNGN, inv.MaxBusinessDays, inv.PaidBusinessDays,
-		inv.TotalEarnedNGN, inv.TotalPendingNGN, inv.Status,
+		inv.TotalEarnedNGN, inv.TotalPendingNGN, inv.Status, inv.IsDemo,
 		inv.MaturityDate, inv.StartedAt, inv.CompletedAt, inv.PausedAt, inv.CancelledAt,
 		inv.EarlyWithdrawalAt, inv.CreatedAt, inv.UpdatedAt,
 	)
@@ -678,6 +678,7 @@ const earningsInvestmentSelect = `
 		i.payment_provider, i.payment_reference, i.payment_status,
 		i.daily_reward_ngn, i.max_business_days, i.paid_business_days,
 		i.total_earned_ngn, i.total_pending_ngn, i.status,
+		COALESCE(i.is_demo, false),
 		i.maturity_date, i.started_at, i.completed_at, i.paused_at, i.cancelled_at,
 		i.early_withdrawal_at, i.created_at, i.updated_at
 	FROM earnings_investments i`
@@ -688,9 +689,57 @@ func earningsInvestmentScanArgs(inv *models.EarningsInvestment) []interface{} {
 		&inv.PaymentProvider, &inv.PaymentReference, &inv.PaymentStatus,
 		&inv.DailyRewardNGN, &inv.MaxBusinessDays, &inv.PaidBusinessDays,
 		&inv.TotalEarnedNGN, &inv.TotalPendingNGN, &inv.Status,
+		&inv.IsDemo,
 		&inv.MaturityDate, &inv.StartedAt, &inv.CompletedAt, &inv.PausedAt, &inv.CancelledAt,
 		&inv.EarlyWithdrawalAt, &inv.CreatedAt, &inv.UpdatedAt,
 	}
+}
+
+// UserHasRealInvestment returns true if the user has any non-demo investment
+// (including pending payment checkouts that were created before deferred-create fix).
+func (s *Store) UserHasRealInvestment(ctx context.Context, userID string) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM earnings_investments
+		WHERE user_id = $1 AND COALESCE(is_demo, false) = false
+		  AND status IN ('active', 'completed', 'pending_payment', 'paused')`, userID,
+	).Scan(&n)
+	return n > 0, err
+}
+
+// UserHasDemoInvestment returns true if a demo seed investment already exists.
+func (s *Store) UserHasDemoInvestment(ctx context.Context, userID string) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM earnings_investments
+		WHERE user_id = $1 AND COALESCE(is_demo, false) = true`, userID,
+	).Scan(&n)
+	return n > 0, err
+}
+
+// ListIdentityUserIDs returns active identity user IDs for demo seeding.
+func (s *Store) ListIdentityUserIDs(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 10000
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT id FROM identity_users
+		WHERE deleted_at IS NULL AND status = 'active'
+		ORDER BY created_at ASC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // ─── Rewards ─────────────────────────────────────────────
