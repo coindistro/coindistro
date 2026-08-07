@@ -704,9 +704,7 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
-		if err := s.store.CreateInvestment(ctx, inv); err != nil {
-			return err
-		}
+		// Persisted atomically with payment completion and wallet credit below.
 		s.logger.Info("Investment created after verified payment",
 			zap.String("investment_id", inv.ID),
 			zap.String("reference", reference),
@@ -723,54 +721,16 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		maturesAt := now.AddDate(0, 0, inv.LockPeriodDays)
 		inv.MaturesAt = &maturesAt
 		inv.UpdatedAt = now
-		if err := s.store.UpdateInvestment(ctx, inv); err != nil {
-			return err
-		}
+		// Persisted atomically with payment completion and wallet credit below.
 	}
 
-	// Mark payment transaction completed.
-	_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
-
-	// Get or create CDT wallet (investments are denominated in CDT).
-	wallet, err := s.store.GetOrCreateWallet(ctx, inv.UserID, "CDT")
+	alreadyProcessed, err := s.store.FinalizeSuccessfulPayment(ctx, pt, inv)
 	if err != nil {
 		return err
 	}
-
-	s.logger.Info("CDT credited",
-		zap.String("user_id", inv.UserID),
-		zap.Float64("amount", inv.AllocatedCDT),
-		zap.String("reference", reference),
-		zap.String("type", "locked"),
-	)
-
-	// Credit locked CDT to wallet.
-	if err := s.store.CreditWalletLocked(ctx, wallet.ID, inv.AllocatedCDT); err != nil {
-		return err
+	if alreadyProcessed {
+		return errors.ErrPaymentAlreadyProcessed
 	}
-
-	// Record wallet transaction.
-	planName := inv.PlanID
-	if inv.Plan != nil && inv.Plan.Name != "" {
-		planName = inv.Plan.Name
-	}
-	wt := &models.WalletTransaction{
-		ID:            uuidlib.NewString(),
-		WalletID:      wallet.ID,
-		Type:          models.WalletTxInvestment,
-		Amount:        inv.AllocatedCDT,
-		BalanceBefore: wallet.TotalBalance,
-		BalanceAfter:  wallet.TotalBalance + inv.AllocatedCDT,
-		Reference:     reference,
-		Description: fmt.Sprintf("Investment in %s plan - %d CDT locked until %s", planName, int(inv.AllocatedCDT), func() string {
-			if inv.MaturesAt != nil {
-				return inv.MaturesAt.Format("2006-01-02")
-			}
-			return ""
-		}()),
-		CreatedAt: now,
-	}
-	_ = s.store.CreateWalletTransaction(ctx, wt)
 
 	// Publish events.
 	s.publish(events.EventDepositCompleted, map[string]interface{}{
@@ -1186,9 +1146,9 @@ func (s *Service) verifyPaystackSignature(payload []byte, signature string) bool
 	if secret == "" || signature == "" {
 		return false
 	}
-	h := sha512.New()
-	h.Write(payload)
-	expected := hex.EncodeToString(h.Sum(nil))
+	mac := hmac.New(sha512.New, []byte(secret))
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signature))
 }
 

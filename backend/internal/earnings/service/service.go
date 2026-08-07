@@ -716,9 +716,6 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
-		if err := s.store.CreateInvestment(ctx, inv); err != nil {
-			return err
-		}
 		s.logger.Info("Investment created after verified payment",
 			zap.String("investment_id", inv.ID),
 			zap.String("reference", reference),
@@ -737,22 +734,15 @@ func (s *Service) processSuccessfulPayment(ctx context.Context, provider, refere
 		inv.StartedAt = &now
 		inv.MaturityDate = &maturityDate
 		inv.UpdatedAt = now
-		if err := s.store.UpdateInvestment(ctx, inv); err != nil {
-			return err
-		}
+		// Persisted atomically with payment completion and wallet credit below.
 	}
 
-	// Mark payment transaction completed
-	_ = s.store.UpdatePaymentTransaction(ctx, pt.ID, "completed", &now)
-
-	// Lock investment capital in the investor USD wallet (idempotent).
-	if err := s.creditLockedWallet(ctx, inv.UserID, inv.AmountUSD, "investment",
-		fmt.Sprintf("CAPITAL-%s", inv.ID),
-		fmt.Sprintf("Locked investment capital $%.2f (%s)", inv.AmountUSD, reference)); err != nil {
-		s.logger.Warn("failed to lock investment capital in wallet",
-			zap.String("investment_id", inv.ID),
-			zap.Error(err),
-		)
+	alreadyProcessed, err := s.store.FinalizeSuccessfulPayment(ctx, pt, inv)
+	if err != nil {
+		return err
+	}
+	if alreadyProcessed {
+		return errors.ErrPaymentAlreadyProcessed
 	}
 
 	// Process referral commission for the referred user
@@ -2350,9 +2340,9 @@ func (s *Service) verifyPaystackSignature(payload []byte, signature string) bool
 	if secret == "" || signature == "" {
 		return false
 	}
-	h := sha512.New()
-	h.Write(payload)
-	expected := hex.EncodeToString(h.Sum(nil))
+	mac := hmac.New(sha512.New, []byte(secret))
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signature))
 }
 

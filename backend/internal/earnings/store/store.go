@@ -1028,6 +1028,101 @@ func (s *Store) UpdatePaymentTransaction(ctx context.Context, id, status string,
 	return err
 }
 
+// FinalizeSuccessfulPayment atomically persists an earnings investment, marks
+// its payment completed, and credits the investor's locked USD wallet.
+// Concurrent webhook and redirect requests serialize on the payment row.
+func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.EarningsPaymentTransaction, inv *models.EarningsInvestment) (bool, error) {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var paymentID, paymentStatus string
+	if err := tx.QueryRow(ctx, `SELECT id, status FROM earnings_payment_transactions WHERE provider = $1 AND reference = $2 FOR UPDATE`, pt.Provider, pt.Reference).Scan(&paymentID, &paymentStatus); err != nil {
+		return false, err
+	}
+	if paymentStatus == "completed" {
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	var persistedStatus string
+	err = tx.QueryRow(ctx, `SELECT status FROM earnings_investments WHERE payment_provider = $1 AND payment_reference = $2 FOR UPDATE`, inv.PaymentProvider, inv.PaymentReference).Scan(&persistedStatus)
+	if err == pgx.ErrNoRows {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO earnings_investments (
+				id, user_id, amount_usd, amount_ngn, exchange_rate,
+				payment_provider, payment_reference, payment_status,
+				daily_reward_ngn, max_business_days, paid_business_days,
+				total_earned_ngn, total_pending_ngn, status, is_demo,
+				maturity_date, started_at, completed_at, paused_at, cancelled_at,
+				early_withdrawal_at, created_at, updated_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+			ON CONFLICT (payment_provider, payment_reference) DO NOTHING`,
+			inv.ID, inv.UserID, inv.AmountUSD, inv.AmountNGN, inv.ExchangeRate,
+			inv.PaymentProvider, inv.PaymentReference, inv.PaymentStatus,
+			inv.DailyRewardNGN, inv.MaxBusinessDays, inv.PaidBusinessDays,
+			inv.TotalEarnedNGN, inv.TotalPendingNGN, inv.Status, inv.IsDemo,
+			inv.MaturityDate, inv.StartedAt, inv.CompletedAt, inv.PausedAt, inv.CancelledAt,
+			inv.EarlyWithdrawalAt, inv.CreatedAt, inv.UpdatedAt)
+		if err == nil {
+			persistedStatus = string(models.InvestmentStatusActive)
+		}
+	} else if err != nil {
+		return false, err
+	}
+	if err != nil {
+		return false, err
+	}
+	if persistedStatus == string(models.InvestmentStatusPendingPayment) {
+		if _, err := tx.Exec(ctx, `UPDATE earnings_investments SET payment_status = 'completed', status = 'active', started_at = $2, maturity_date = $3, updated_at = $2 WHERE payment_provider = $1 AND payment_reference = $4`, inv.PaymentProvider, inv.StartedAt, inv.MaturityDate, inv.PaymentReference); err != nil {
+			return false, err
+		}
+	}
+
+	var walletID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO wallets (id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at)
+		VALUES (uuid_generate_v4(), $1, 'USD', 0, 0, 0, 0, NOW())
+		ON CONFLICT (user_id, currency) DO UPDATE SET updated_at = wallets.updated_at
+		RETURNING id`, inv.UserID).Scan(&walletID); err != nil {
+		return false, err
+	}
+
+	capitalReference := fmt.Sprintf("CAPITAL-%s", inv.ID)
+	var alreadyCredited bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wallet_transactions WHERE reference = $1)`, capitalReference).Scan(&alreadyCredited); err != nil {
+		return false, err
+	}
+	if !alreadyCredited {
+		var before float64
+		if err := tx.QueryRow(ctx, `SELECT total_balance FROM wallets WHERE id = $1 FOR UPDATE`, walletID).Scan(&before); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE wallets SET locked_balance = locked_balance + $2, total_balance = total_balance + $2, updated_at = NOW() WHERE id = $1`, walletID, inv.AmountUSD); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO wallet_transactions (id, wallet_id, type, amount, balance_before, balance_after, reference, description, created_at)
+			VALUES (uuid_generate_v4(), $1, 'investment', $2, $3, $4, $5, $6, NOW())
+			ON CONFLICT (reference) DO NOTHING`, walletID, inv.AmountUSD, before, before+inv.AmountUSD, capitalReference,
+			fmt.Sprintf("Locked investment capital $%.2f", inv.AmountUSD)); err != nil {
+			return false, err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE earnings_payment_transactions SET status = 'completed', paid_at = NOW(), investment_id = $2 WHERE id = $1`, paymentID, inv.ID); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
 func (s *Store) GetPaymentTransactionByReference(ctx context.Context, provider, reference string) (*models.EarningsPaymentTransaction, error) {
 	var pt models.EarningsPaymentTransaction
 	err := s.pool.QueryRow(ctx, `

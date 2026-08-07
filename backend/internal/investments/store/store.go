@@ -357,6 +357,97 @@ func (s *Store) UpdatePaymentTransaction(ctx context.Context, id, status string,
 	return err
 }
 
+// FinalizeSuccessfulPayment atomically persists the investment, marks the
+// payment completed, and credits the user's locked CDT wallet. The payment
+// row is locked first so concurrent webhook/redirect requests serialize on the
+// provider transaction and cannot double-credit the wallet.
+//
+// The returned bool reports that the payment was already completed.
+func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.PaymentTransaction, inv *models.Investment) (bool, error) {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var paymentStatus string
+	if err := tx.QueryRow(ctx, `SELECT status FROM payment_transactions WHERE id = $1 FOR UPDATE`, pt.ID).Scan(&paymentStatus); err != nil {
+		return false, err
+	}
+	if paymentStatus == "completed" {
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	var persistedStatus string
+	err = tx.QueryRow(ctx, `SELECT status FROM investments WHERE payment_provider = $1 AND payment_reference = $2 FOR UPDATE`, inv.PaymentProvider, inv.PaymentReference).Scan(&persistedStatus)
+	if err == pgx.ErrNoRows {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO investments (
+				id, user_id, plan_id, payment_provider, payment_reference, payment_status,
+				amount_paid, currency, exchange_rate, cdt_price, allocated_cdt, roi_percent, roi_cdt,
+				lock_period_days, status, started_at, matures_at, completed_at, created_at, updated_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+			ON CONFLICT (payment_provider, payment_reference) DO NOTHING`,
+			inv.ID, inv.UserID, inv.PlanID, inv.PaymentProvider, inv.PaymentReference, inv.PaymentStatus,
+			inv.AmountPaid, inv.Currency, inv.ExchangeRate, inv.CDTPrice, inv.AllocatedCDT, inv.ROIPercent, inv.ROICDT,
+			inv.LockPeriodDays, inv.Status, inv.StartedAt, inv.MaturesAt, inv.CompletedAt, inv.CreatedAt, inv.UpdatedAt)
+		if err == nil {
+			persistedStatus = string(models.InvestmentStatusActive)
+		}
+	} else if err != nil {
+		return false, err
+	}
+	if err != nil {
+		return false, err
+	}
+	if persistedStatus == string(models.InvestmentStatusPending) {
+		if _, err := tx.Exec(ctx, `UPDATE investments SET payment_status = 'completed', status = 'active', started_at = $2, matures_at = $3, updated_at = $2 WHERE payment_provider = $1 AND payment_reference = $4`, inv.PaymentProvider, inv.StartedAt, inv.MaturesAt, inv.PaymentReference); err != nil {
+			return false, err
+		}
+	}
+
+	var walletID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO wallets (id, user_id, currency, available_balance, locked_balance, staking_balance, total_balance, updated_at)
+		VALUES (uuid_generate_v4(), $1, 'CDT', 0, 0, 0, 0, NOW())
+		ON CONFLICT (user_id, currency) DO UPDATE SET updated_at = wallets.updated_at
+		RETURNING id`, inv.UserID).Scan(&walletID); err != nil {
+		return false, err
+	}
+
+	var alreadyCredited bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wallet_transactions WHERE reference = $1)`, inv.PaymentReference).Scan(&alreadyCredited); err != nil {
+		return false, err
+	}
+	if !alreadyCredited {
+		var before float64
+		if err := tx.QueryRow(ctx, `SELECT total_balance FROM wallets WHERE id = $1 FOR UPDATE`, walletID).Scan(&before); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE wallets SET locked_balance = locked_balance + $2, total_balance = total_balance + $2, updated_at = NOW() WHERE id = $1`, walletID, inv.AllocatedCDT); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO wallet_transactions (id, wallet_id, type, amount, balance_before, balance_after, reference, description, created_at)
+			VALUES (uuid_generate_v4(), $1, 'investment', $2, $3, $4, $5, $6, NOW())
+			ON CONFLICT (reference) DO NOTHING`, walletID, inv.AllocatedCDT, before, before+inv.AllocatedCDT,
+			inv.PaymentReference, fmt.Sprintf("Investment capital locked until %s", inv.MaturesAt.Format("2006-01-02"))); err != nil {
+			return false, err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE payment_transactions SET status = 'completed', paid_at = $2 WHERE id = $1`, pt.ID, inv.StartedAt); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
 func (s *Store) GetPaymentTransactionByReference(ctx context.Context, provider, reference string) (*models.PaymentTransaction, error) {
 	var pt models.PaymentTransaction
 	err := s.pool.QueryRow(ctx, `
