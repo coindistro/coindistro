@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/coindistro/backend/internal/investments/errors"
 	"github.com/coindistro/backend/internal/investments/models"
 	"github.com/coindistro/backend/internal/investments/service"
 	"github.com/coindistro/backend/internal/middleware"
@@ -161,6 +162,10 @@ func (h *Handlers) PaystackWebhook(c *gin.Context) {
 
 	signature := c.GetHeader("x-paystack-signature")
 	if err := h.svc.ProcessPaystackWebhook(c.Request.Context(), payload, signature); err != nil {
+		if err == errors.ErrDuplicateWebhook {
+			response.OK(c, "Webhook already processed", nil)
+			return
+		}
 		h.logger.Error("paystack webhook processing failed", zap.Error(err))
 		response.HandleError(c, err)
 		return
@@ -184,6 +189,10 @@ func (h *Handlers) FlutterwaveWebhook(c *gin.Context) {
 
 	signature := c.GetHeader("verif-hash")
 	if err := h.svc.ProcessFlutterwaveWebhook(c.Request.Context(), payload, signature); err != nil {
+		if err == errors.ErrDuplicateWebhook {
+			response.OK(c, "Webhook already processed", nil)
+			return
+		}
 		h.logger.Error("flutterwave webhook processing failed", zap.Error(err))
 		response.HandleError(c, err)
 		return

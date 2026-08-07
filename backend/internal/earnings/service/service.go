@@ -513,6 +513,13 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 
 	eventID := fmt.Sprintf("paystack-earnings-%d", event.Data.ID)
 	reference := event.Data.Reference
+	claimed, err := s.store.RecordPaymentWebhook(ctx, "paystack", eventID, reference, signature, payload)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return errors.ErrDuplicateWebhook
+	}
 
 	s.logger.Info("Processing Paystack charge.success",
 		zap.String("reference", reference),
@@ -553,14 +560,9 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 		return err
 	}
 
-	// Record webhook event for deduplication
-	_ = s.store.CreatePaymentTransaction(ctx, &models.EarningsPaymentTransaction{
-		UserID:    "",
-		Provider:  "paystack",
-		Reference: eventID,
-		Type:      "webhook",
-		Status:    "processed",
-	})
+	if err := s.store.MarkPaymentWebhookProcessed(ctx, "paystack", eventID); err != nil {
+		return err
+	}
 
 	s.logger.Info("Investment activated",
 		zap.String("reference", reference),
@@ -599,6 +601,13 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 
 	eventID := fmt.Sprintf("flutterwave-earnings-%d", event.Data.ID)
 	reference := event.Data.Reference
+	claimed, err := s.store.RecordPaymentWebhook(ctx, "flutterwave", eventID, reference, signature, payload)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return errors.ErrDuplicateWebhook
+	}
 
 	existing, err := s.store.GetPaymentTransactionByReference(ctx, "flutterwave", reference)
 	if err != nil {
@@ -627,15 +636,7 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 		return err
 	}
 
-	_ = s.store.CreatePaymentTransaction(ctx, &models.EarningsPaymentTransaction{
-		UserID:    "",
-		Provider:  "flutterwave",
-		Reference: eventID,
-		Type:      "webhook",
-		Status:    "processed",
-	})
-
-	return nil
+	return s.store.MarkPaymentWebhookProcessed(ctx, "flutterwave", eventID)
 }
 
 // processSuccessfulPayment runs ONLY after Paystack/Flutterwave verification succeeds.

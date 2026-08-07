@@ -64,16 +64,24 @@ type Investment struct {
 
 // PaymentTransaction represents a payment transaction record.
 type PaymentTransaction struct {
-	ID        string     `json:"id" db:"id"`
-	UserID    string     `json:"user_id" db:"user_id"`
-	Provider  string     `json:"provider" db:"provider"`
-	Reference string     `json:"reference" db:"reference"`
-	Status    string     `json:"status" db:"status"`
-	Amount    float64    `json:"amount" db:"amount"`
-	Currency  string     `json:"currency" db:"currency"`
-	Response  []byte     `json:"response,omitempty" db:"response"`
-	PaidAt    *time.Time `json:"paid_at,omitempty" db:"paid_at"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	ID            string     `json:"id" db:"id"`
+	UserID        string     `json:"user_id" db:"user_id"`
+	Provider      string     `json:"provider" db:"provider"`
+	Reference     string     `json:"reference" db:"reference"`
+	Status        string     `json:"status" db:"status"`
+	Amount        float64    `json:"amount" db:"amount"`
+	Currency      string     `json:"currency" db:"currency"`
+	Response      []byte     `json:"response,omitempty" db:"response"`
+	PaidAt        *time.Time `json:"paid_at,omitempty" db:"paid_at"`
+	InitializedAt *time.Time `json:"initialized_at,omitempty" db:"initialized_at"`
+	ProcessingAt  *time.Time `json:"processing_at,omitempty" db:"processing_at"`
+	VerifiedAt    *time.Time `json:"verified_at,omitempty" db:"verified_at"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	FailedAt      *time.Time `json:"failed_at,omitempty" db:"failed_at"`
+	CancelledAt   *time.Time `json:"cancelled_at,omitempty" db:"cancelled_at"`
+	ExpiredAt     *time.Time `json:"expired_at,omitempty" db:"expired_at"`
+	RefundedAt    *time.Time `json:"refunded_at,omitempty" db:"refunded_at"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 }
 
 // ─── Wallets ───────────────────────────────────────────

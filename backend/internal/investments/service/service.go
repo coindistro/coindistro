@@ -522,18 +522,12 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 	eventID := fmt.Sprintf("paystack-%d", event.Data.ID)
 	reference := event.Data.Reference
 
-	// Deduplicate webhook
-	processed, err := s.store.IsWebhookProcessed(ctx, "paystack", eventID)
+	claimed, err := s.store.RecordPaymentWebhook(ctx, "paystack", eventID, reference, signature, payload)
 	if err != nil {
 		return err
 	}
-	if processed {
+	if !claimed {
 		return errors.ErrDuplicateWebhook
-	}
-
-	// Record webhook event
-	if err := s.store.CreateWebhookEvent(ctx, "paystack", eventID, reference, payload); err != nil {
-		return err
 	}
 
 	// Verify payment with Paystack API
@@ -551,7 +545,7 @@ func (s *Service) ProcessPaystackWebhook(ctx context.Context, payload []byte, si
 	}
 
 	// Mark webhook as processed
-	return s.store.MarkWebhookProcessed(ctx, "paystack", eventID)
+	return s.store.MarkPaymentWebhookProcessed(ctx, "paystack", eventID)
 }
 
 // ProcessFlutterwaveWebhook processes an incoming Flutterwave webhook event.
@@ -587,18 +581,12 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 	eventID := fmt.Sprintf("flutterwave-%d", event.Data.ID)
 	reference := event.Data.Reference
 
-	// Deduplicate webhook
-	processed, err := s.store.IsWebhookProcessed(ctx, "flutterwave", eventID)
+	claimed, err := s.store.RecordPaymentWebhook(ctx, "flutterwave", eventID, reference, signature, payload)
 	if err != nil {
 		return err
 	}
-	if processed {
+	if !claimed {
 		return errors.ErrDuplicateWebhook
-	}
-
-	// Record webhook event
-	if err := s.store.CreateWebhookEvent(ctx, "flutterwave", eventID, reference, payload); err != nil {
-		return err
 	}
 
 	// Verify payment with Flutterwave API
@@ -620,7 +608,7 @@ func (s *Service) ProcessFlutterwaveWebhook(ctx context.Context, payload []byte,
 	}
 
 	// Mark webhook as processed
-	return s.store.MarkWebhookProcessed(ctx, "flutterwave", eventID)
+	return s.store.MarkPaymentWebhookProcessed(ctx, "flutterwave", eventID)
 }
 
 // ─── Payment Success Processing ───────────────────────────

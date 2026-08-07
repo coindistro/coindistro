@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/coindistro/backend/internal/earnings/models"
+	"github.com/coindistro/backend/internal/payments/lifecycle"
 )
 
 // Store handles earnings investment persistence.
@@ -1013,13 +1014,24 @@ func (s *Store) GetLastWithdrawal(ctx context.Context, userID string) (*models.W
 
 // ─── Payment Transactions ────────────────────────────────
 
+// RecordPaymentWebhook atomically claims a provider event ID for replay protection.
+func (s *Store) RecordPaymentWebhook(ctx context.Context, provider, eventID, reference, signature string, payload []byte) (bool, error) {
+	command, err := s.pool.Exec(ctx, `INSERT INTO payment_webhook_events (payment_scope, provider, event_id, reference, signature, payload) VALUES ('earnings', $1, $2, $3, $4, $5) ON CONFLICT (payment_scope, provider, event_id) DO NOTHING`, provider, eventID, reference, signature, payload)
+	return command.RowsAffected() == 1, err
+}
+
+func (s *Store) MarkPaymentWebhookProcessed(ctx context.Context, provider, eventID string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE payment_webhook_events SET processed_at = COALESCE(processed_at, NOW()) WHERE payment_scope = 'earnings' AND provider = $1 AND event_id = $2`, provider, eventID)
+	return err
+}
+
 func (s *Store) CreatePaymentTransaction(ctx context.Context, pt *models.EarningsPaymentTransaction) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO earnings_payment_transactions (id, user_id, investment_id, provider, reference,
-			type, status, amount_ngn, amount_usd, exchange_rate, response, paid_at, created_at)
-		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+			type, status, amount_ngn, amount_usd, exchange_rate, response, paid_at, initialized_at, created_at)
+		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW()), NOW())`,
 		pt.UserID, pt.InvestmentID, pt.Provider, pt.Reference, pt.Type, pt.Status,
-		pt.AmountNGN, pt.AmountUSD, pt.ExchangeRate, pt.Response, pt.PaidAt)
+		pt.AmountNGN, pt.AmountUSD, pt.ExchangeRate, pt.Response, pt.PaidAt, pt.InitializedAt)
 	return err
 }
 
@@ -1047,6 +1059,17 @@ func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.Earnin
 			return false, err
 		}
 		return true, nil
+	}
+	if err := lifecycle.ValidateTransition(lifecycle.State(paymentStatus), lifecycle.Processing); err != nil && paymentStatus != string(lifecycle.Processing) {
+		return false, err
+	}
+	if paymentStatus == string(lifecycle.Pending) {
+		if _, err := tx.Exec(ctx, `UPDATE earnings_payment_transactions SET status = 'processing', processing_at = COALESCE(processing_at, NOW()) WHERE id = $1`, paymentID); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO payment_audit_events (payment_scope, payment_id, provider, reference, user_id, event, amount, currency) VALUES ('earnings', $1, $2, $3, $4, 'payment.processing', $5, 'USD')`, paymentID, pt.Provider, pt.Reference, pt.UserID, pt.AmountUSD); err != nil {
+			return false, err
+		}
 	}
 
 	var persistedStatus string
@@ -1094,6 +1117,7 @@ func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.Earnin
 
 	capitalReference := fmt.Sprintf("CAPITAL-%s", inv.ID)
 	var alreadyCredited bool
+	var walletBefore, walletAfter *float64
 	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wallet_transactions WHERE reference = $1)`, capitalReference).Scan(&alreadyCredited); err != nil {
 		return false, err
 	}
@@ -1102,6 +1126,8 @@ func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.Earnin
 		if err := tx.QueryRow(ctx, `SELECT total_balance FROM wallets WHERE id = $1 FOR UPDATE`, walletID).Scan(&before); err != nil {
 			return false, err
 		}
+		after := before + inv.AmountUSD
+		walletBefore, walletAfter = &before, &after
 		if _, err := tx.Exec(ctx, `UPDATE wallets SET locked_balance = locked_balance + $2, total_balance = total_balance + $2, updated_at = NOW() WHERE id = $1`, walletID, inv.AmountUSD); err != nil {
 			return false, err
 		}
@@ -1114,7 +1140,10 @@ func (s *Store) FinalizeSuccessfulPayment(ctx context.Context, pt *models.Earnin
 		}
 	}
 
-	if _, err := tx.Exec(ctx, `UPDATE earnings_payment_transactions SET status = 'completed', paid_at = NOW(), investment_id = $2 WHERE id = $1`, paymentID, inv.ID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE earnings_payment_transactions SET status = 'completed', paid_at = NOW(), verified_at = COALESCE(verified_at, NOW()), completed_at = COALESCE(completed_at, NOW()), investment_id = $2 WHERE id = $1`, paymentID, inv.ID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_audit_events (payment_scope, payment_id, provider, reference, user_id, investment_id, event, wallet_before, wallet_after, amount, currency) VALUES ('earnings', $1, $2, $3, $4, $5, 'payment.completed', $6, $7, $8, 'USD')`, paymentID, pt.Provider, pt.Reference, pt.UserID, inv.ID, walletBefore, walletAfter, pt.AmountUSD); err != nil {
 		return false, err
 	}
 	if err := tx.Commit(ctx); err != nil {

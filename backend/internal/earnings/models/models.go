@@ -64,31 +64,31 @@ const (
 
 // EarningsInvestment represents a user's Naira-based earnings investment.
 type EarningsInvestment struct {
-	ID                string           `json:"id" db:"id"`
-	UserID            string           `json:"user_id" db:"user_id"`
-	AmountUSD         float64          `json:"amount_usd" db:"amount_usd"`
-	AmountNGN         float64          `json:"amount_ngn" db:"amount_ngn"`
-	ExchangeRate      float64          `json:"exchange_rate" db:"exchange_rate"`
-	PaymentProvider   string           `json:"payment_provider" db:"payment_provider"`
-	PaymentReference  string           `json:"payment_reference" db:"payment_reference"`
-	PaymentStatus     string           `json:"payment_status" db:"payment_status"`
-	DailyRewardNGN    float64          `json:"daily_reward_ngn" db:"daily_reward_ngn"`
-	MaxBusinessDays   int              `json:"max_business_days" db:"max_business_days"`
-	PaidBusinessDays  int              `json:"paid_business_days" db:"paid_business_days"`
-	TotalEarnedNGN    float64          `json:"total_earned_ngn" db:"total_earned_ngn"`
-	TotalPendingNGN   float64          `json:"total_pending_ngn" db:"total_pending_ngn"`
-	Status            InvestmentStatus `json:"status" db:"status"`
+	ID               string           `json:"id" db:"id"`
+	UserID           string           `json:"user_id" db:"user_id"`
+	AmountUSD        float64          `json:"amount_usd" db:"amount_usd"`
+	AmountNGN        float64          `json:"amount_ngn" db:"amount_ngn"`
+	ExchangeRate     float64          `json:"exchange_rate" db:"exchange_rate"`
+	PaymentProvider  string           `json:"payment_provider" db:"payment_provider"`
+	PaymentReference string           `json:"payment_reference" db:"payment_reference"`
+	PaymentStatus    string           `json:"payment_status" db:"payment_status"`
+	DailyRewardNGN   float64          `json:"daily_reward_ngn" db:"daily_reward_ngn"`
+	MaxBusinessDays  int              `json:"max_business_days" db:"max_business_days"`
+	PaidBusinessDays int              `json:"paid_business_days" db:"paid_business_days"`
+	TotalEarnedNGN   float64          `json:"total_earned_ngn" db:"total_earned_ngn"`
+	TotalPendingNGN  float64          `json:"total_pending_ngn" db:"total_pending_ngn"`
+	Status           InvestmentStatus `json:"status" db:"status"`
 	// IsDemo marks temporary seed/demo investments (safe to purge).
-	IsDemo            bool             `json:"is_demo" db:"is_demo"`
-	PlanName          string           `json:"plan_name,omitempty" db:"-"`
-	MaturityDate      *time.Time       `json:"maturity_date,omitempty" db:"maturity_date"`
-	StartedAt         *time.Time       `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt       *time.Time       `json:"completed_at,omitempty" db:"completed_at"`
-	PausedAt          *time.Time       `json:"paused_at,omitempty" db:"paused_at"`
-	CancelledAt       *time.Time       `json:"cancelled_at,omitempty" db:"cancelled_at"`
-	EarlyWithdrawalAt *time.Time       `json:"early_withdrawal_at,omitempty" db:"early_withdrawal_at"`
-	CreatedAt         time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt         time.Time        `json:"updated_at" db:"updated_at"`
+	IsDemo            bool       `json:"is_demo" db:"is_demo"`
+	PlanName          string     `json:"plan_name,omitempty" db:"-"`
+	MaturityDate      *time.Time `json:"maturity_date,omitempty" db:"maturity_date"`
+	StartedAt         *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt       *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	PausedAt          *time.Time `json:"paused_at,omitempty" db:"paused_at"`
+	CancelledAt       *time.Time `json:"cancelled_at,omitempty" db:"cancelled_at"`
+	EarlyWithdrawalAt *time.Time `json:"early_withdrawal_at,omitempty" db:"early_withdrawal_at"`
+	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // ─── Investment Reward ────────────────────────────────────
@@ -151,19 +151,27 @@ type Withdrawal struct {
 
 // EarningsPaymentTransaction represents a payment transaction record.
 type EarningsPaymentTransaction struct {
-	ID           string     `json:"id" db:"id"`
-	UserID       string     `json:"user_id" db:"user_id"`
-	InvestmentID *string    `json:"investment_id,omitempty" db:"investment_id"`
-	Provider     string     `json:"provider" db:"provider"`
-	Reference    string     `json:"reference" db:"reference"`
-	Type         string     `json:"type" db:"type"`
-	Status       string     `json:"status" db:"status"`
-	AmountNGN    float64    `json:"amount_ngn" db:"amount_ngn"`
-	AmountUSD    float64    `json:"amount_usd" db:"amount_usd"`
-	ExchangeRate float64    `json:"exchange_rate" db:"exchange_rate"`
-	Response     []byte     `json:"response,omitempty" db:"response"`
-	PaidAt       *time.Time `json:"paid_at,omitempty" db:"paid_at"`
-	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+	ID            string     `json:"id" db:"id"`
+	UserID        string     `json:"user_id" db:"user_id"`
+	InvestmentID  *string    `json:"investment_id,omitempty" db:"investment_id"`
+	Provider      string     `json:"provider" db:"provider"`
+	Reference     string     `json:"reference" db:"reference"`
+	Type          string     `json:"type" db:"type"`
+	Status        string     `json:"status" db:"status"`
+	AmountNGN     float64    `json:"amount_ngn" db:"amount_ngn"`
+	AmountUSD     float64    `json:"amount_usd" db:"amount_usd"`
+	ExchangeRate  float64    `json:"exchange_rate" db:"exchange_rate"`
+	Response      []byte     `json:"response,omitempty" db:"response"`
+	PaidAt        *time.Time `json:"paid_at,omitempty" db:"paid_at"`
+	InitializedAt *time.Time `json:"initialized_at,omitempty" db:"initialized_at"`
+	ProcessingAt  *time.Time `json:"processing_at,omitempty" db:"processing_at"`
+	VerifiedAt    *time.Time `json:"verified_at,omitempty" db:"verified_at"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	FailedAt      *time.Time `json:"failed_at,omitempty" db:"failed_at"`
+	CancelledAt   *time.Time `json:"cancelled_at,omitempty" db:"cancelled_at"`
+	ExpiredAt     *time.Time `json:"expired_at,omitempty" db:"expired_at"`
+	RefundedAt    *time.Time `json:"refunded_at,omitempty" db:"refunded_at"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 }
 
 // ─── Referral Commission ──────────────────────────────────
@@ -266,8 +274,8 @@ type AdminWithdrawalActionRequest struct {
 // ─── Response DTOs ────────────────────────────────────────
 
 type EarningsDashboard struct {
-	TotalInvestedUSD     float64 `json:"total_invested_usd"`
-	TotalInvestedNGN     float64 `json:"total_invested_ngn"`
+	TotalInvestedUSD float64 `json:"total_invested_usd"`
+	TotalInvestedNGN float64 `json:"total_invested_ngn"`
 	// PortfolioValue = capital invested + total profit (earnings). Display only — not free cash.
 	PortfolioValueUSD float64 `json:"portfolio_value_usd"`
 	PortfolioValueNGN float64 `json:"portfolio_value_ngn"`
@@ -339,14 +347,14 @@ type EarningsSummary struct {
 
 // SeedPoolCreditResult summarizes one investor pool credit.
 type SeedPoolCreditResult struct {
-	UserID         string  `json:"user_id"`
-	InvestmentID   string  `json:"investment_id"`
-	AmountUSD      float64 `json:"amount_usd"`
-	ProfitUSD      float64 `json:"profit_usd"`
-	ProfitNGN      float64 `json:"profit_ngn"`
-	PortfolioUSD   float64 `json:"portfolio_usd"`
-	AlreadyCredited bool   `json:"already_credited"`
-	RewardID       string  `json:"reward_id,omitempty"`
+	UserID          string  `json:"user_id"`
+	InvestmentID    string  `json:"investment_id"`
+	AmountUSD       float64 `json:"amount_usd"`
+	ProfitUSD       float64 `json:"profit_usd"`
+	ProfitNGN       float64 `json:"profit_ngn"`
+	PortfolioUSD    float64 `json:"portfolio_usd"`
+	AlreadyCredited bool    `json:"already_credited"`
+	RewardID        string  `json:"reward_id,omitempty"`
 }
 
 // SeedPoolCreditSummary is returned by the Genesis pool seed job.

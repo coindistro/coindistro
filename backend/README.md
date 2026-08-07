@@ -625,6 +625,36 @@ Migration: `migrations/003_earn_service.sql`
 
 Reward calculations are **display/estimate only** — no custody or on-chain execution.
 
+## Payment lifecycle and recovery
+
+Migration `migrations/014_payment_lifecycle_hardening.sql` adds non-destructive
+payment lifecycle timestamps, immutable payment audit events, webhook replay
+records, and a retry queue. Run it through the normal migration runner before
+deploying the corresponding backend release.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: payment.initialized
+    pending --> processing
+    pending --> cancelled
+    pending --> expired
+    processing --> completed: gateway verified and financial transaction commits
+    processing --> failed
+    completed --> refunded
+```
+
+Webhook delivery is authenticated first, then its provider event ID is claimed
+in `payment_webhook_events`. A duplicate claim returns HTTP 200 without
+reprocessing. Financial activation uses one database transaction: it creates
+or activates the investment, records the wallet ledger entry, credits the
+wallet, and marks the payment complete. If that transaction cannot commit, the
+payment remains recoverable and belongs in `payment_retry_queue`.
+
+Retry attempts are scheduled at 1 minute, 5 minutes, 15 minutes, 30 minutes,
+and 1 hour; after the final attempt, alert an administrator. Reconciliation
+compares payment completion, investment creation, wallet ledgers, and
+webhook/audit records by `(provider, reference)` before any correction.
+
 ## Future Microservice Roadmap
 
 The current codebase is a monolith designed for clean extraction into services:
